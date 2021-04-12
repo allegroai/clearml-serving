@@ -17,7 +17,7 @@
 
 </div>
 
-![alt screenshots](docs/webapp_screenshots.gif "screenshots")
+<a href="https://app.community.clear.ml"><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/webapp_screenshots.gif?raw=true" width="100%"></a>
 
 
 **`clearml-serving`** is a command line utility for the flexible orchestration of your model deployment.  
