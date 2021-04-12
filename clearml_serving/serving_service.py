@@ -52,7 +52,7 @@ class ServingService(object):
                 self._task = Task.create(
                     project_name=task_project, task_name=task_name, task_type=Task.TaskTypes.service,
                     repo="https://github.com/allegroai/clearml-serving.git",
-                    branch="master",
+                    branch="main",
                     script="clearml_serving/service.py",
                     working_directory=".",
                     add_task_init_call=False,
@@ -189,7 +189,7 @@ class ServingService(object):
                 task_name="triton serving engine",
                 task_type=Task.TaskTypes.inference,
                 repo="https://github.com/allegroai/clearml-serving.git",
-                branch="master",
+                branch="main",
                 script="clearml_serving/triton_helper.py",
                 working_directory=".",
                 docker="nvcr.io/nvidia/tritonserver:21.03-py3 --ipc=host -p 8000:8000 -p 8001:8001 -p 8002:8002",
