@@ -114,7 +114,12 @@ class TritonHelper(object):
             cmd.append('--{}={}'.format(k, v))
 
         print('Starting server: {}'.format(cmd))
-        proc = subprocess.Popen(cmd)
+        try:
+            proc = subprocess.Popen(cmd)
+        except FileNotFoundError:
+            raise ValueError(
+                "Triton Server Engine (tritonserver) could not be found!\n"
+                "Verify you running inside the `nvcr.io/nvidia/tritonserver` docker container")
         base_freq = min(update_frequency_sec, metric_frequency_sec)
         metric_tic = update_tic = time()
         while True:
