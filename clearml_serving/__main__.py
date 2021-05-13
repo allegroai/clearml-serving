@@ -37,7 +37,7 @@ def cmd_triton(args):
     if not args.id and not args.name:
         raise ValueError("Serving service must have a name, use --name <service_name>")
 
-    if args.id:
+    if args.id and not args.project and not args.name:
         a_serving = ServingService(task_id=args.id)
     else:
         a_serving = ServingService(task_project=args.project, task_name=args.name, engine_type='triton')
@@ -87,10 +87,11 @@ def cmd_launch(args):
     a_serving.launch_engine(queue_name=args.queue)
 
 
-def cli():
+def cli(verbosity):
     title = 'clearml-serving - CLI for launching ClearML serving engine'
     print(title)
     parser = ArgumentParser(prog='clearml-serving', description=title)
+    parser.add_argument('--debug', action='store_true', help='Print debug messages')
     subparsers = parser.add_subparsers(help='Serving engine commands', dest='command')
 
     # create the launch command
@@ -142,6 +143,7 @@ def cli():
     parser_trt.set_defaults(func=cmd_triton)
 
     args = parser.parse_args()
+    verbosity['debug'] = args.debug
     args = restore_state(args)
 
     if args.command:
@@ -151,12 +153,15 @@ def cli():
 
 
 def main():
+    verbosity = dict(debug=False)
     try:
-        cli()
+        cli(verbosity)
     except KeyboardInterrupt:
         print('\nUser aborted')
     except Exception as ex:
         print('\nError: {}'.format(ex))
+        if verbosity.get('debug'):
+            raise ex
         exit(1)
 
 
