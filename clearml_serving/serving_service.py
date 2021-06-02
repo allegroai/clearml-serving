@@ -45,10 +45,16 @@ class ServingService(object):
         elif task_id:
             self._task = Task.get_task(task_id=task_id)
         else:
-            # noinspection PyProtectedMember
-            if Task._query_tasks(project_name=task_project, task_name=task_name):
-                self._task = Task.get_task(project_name=task_project, task_name=task_name)
-            else:
+            # try to get a Task if we can find one
+            self._task = None
+            try:
+                # noinspection PyProtectedMember
+                if Task._query_tasks(project_name=task_project, task_name=task_name):
+                    self._task = Task.get_task(project_name=task_project, task_name=task_name)
+            except ValueError:
+                pass
+
+            if not self._task:
                 self._task = Task.create(
                     project_name=task_project, task_name=task_name, task_type=Task.TaskTypes.service,
                     repo="https://github.com/allegroai/clearml-serving.git",
