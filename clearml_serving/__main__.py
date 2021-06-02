@@ -127,7 +127,7 @@ def cli(verbosity):
         help='Serving endpoint, support multiple versions, '
              'max versions to deploy (version number always increase). Default (no versioning).')
     parser_trt.add_argument(
-        '--config', required=False, type=FileType,
+        '--config', required=False, type=FileType('r'),
         help='Model `config.pbtxt` file, one per model, order matching with models')
     parser_trt.add_argument(
         '--model-id', type=str,
