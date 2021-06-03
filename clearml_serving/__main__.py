@@ -39,7 +39,7 @@ def cmd_triton(args):
     if not args.id and not args.name:
         raise ValueError("Serving service must have a name, use --name <service_name>")
 
-    if args.cmd_id or (args.id and not args.project and not args.name):
+    if args.cmd_id or (args.id and not args.name):
         a_serving = ServingService(task_id=args.cmd_id or args.id)
     else:
         a_serving = ServingService(task_project=args.project, task_name=args.name, engine_type='triton')
