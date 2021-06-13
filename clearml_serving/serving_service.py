@@ -178,18 +178,24 @@ class ServingService(object):
             self._task.reset()
             self._task.enqueue(task=self._task, queue_name=queue_name, queue_id=queue_id)
 
-    def launch_engine(self, queue_name, queue_id=None, verbose=True):
-        # type: (Optional[str], Optional[str], bool) -> None
+    def launch_engine(self, queue_name, queue_id=None, container=None, container_args=None, verbose=True):
+        # type: (Optional[str], Optional[str], Optional[str], Optional[str], bool) -> None
         """
         Launch serving engine on a specific queue
 
         :param queue_name: Queue name to launch the engine service running the inference on.
         :param queue_id: specify queue id (unique stand stable) instead of queue_name
+        :param container: Optional: specify serving engine container.
+        :param container_args: Optional: specify serving engine container arguments.
+        Notice these arguments will override any default container arguments!
         :param verbose: If True print progress to console
         """
 
         # todo: add more engines
         if self._engine_type == 'triton':
+            engine_type_container = "nvcr.io/nvidia/tritonserver:21.03-py3"
+            engine_type_args = "--ipc=host -p 8000:8000 -p 8001:8001 -p 8002:8002"
+
             # create the serving engine Task
             engine_task = Task.create(
                 project_name=self._task.get_project_name(),
@@ -200,9 +206,16 @@ class ServingService(object):
                 commit="ad049c51c146e9b7852f87e2f040e97d88848a1f",
                 script="clearml_serving/triton_helper.py",
                 working_directory=".",
-                docker="nvcr.io/nvidia/tritonserver:21.03-py3 --ipc=host -p 8000:8000 -p 8001:8001 -p 8002:8002",
+                docker=container or engine_type_container,
+                docker_args=container_args or engine_type_args,
                 argparse_args=[('serving_id', self._task.id), ],
                 add_task_init_call=False,
+                packages=[
+                    'clearml',
+                    'azure-storage-blob>=2.0.1,<=2.1',
+                    'google-cloud-storage>=1.13.2',
+                    'boto3>=1.9',
+                ],
             )
             if verbose:
                 print('Launching engine {} on queue {}'.format(self._engine_type, queue_id or queue_name))
