@@ -86,7 +86,11 @@ def cmd_launch(args):
     # launch services queue
     a_serving.launch(queue_name=args.service_queue)
     # launch engine
-    a_serving.launch_engine(queue_name=args.queue)
+    a_serving.launch_engine(
+        queue_name=args.queue,
+        container=args.engine_container or None,
+        container_args=args.engine_container_args or None,
+    )
 
 
 def cli(verbosity):
@@ -104,6 +108,13 @@ def cli(verbosity):
     parser_launch.add_argument(
         '--queue', default=None, type=str, required=True,
         help='Specify the clearml queue to be used for the serving engine server')
+    parser_launch.add_argument(
+        '--engine-container', default=None, type=str, required=False,
+        help='Specify the serving engine container to use.')
+    parser_launch.add_argument(
+        '--engine-container-args', default=None, type=str, required=False,
+        help='Specify the serving engine container execution arguments (single string). '
+             'Notice: this will override any default container arguments')
     parser_launch.add_argument(
         '--service-queue', default='services', type=str,
         help='Specify the service queue to be used for the serving service, default: services queue')
