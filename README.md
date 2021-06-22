@@ -48,7 +48,7 @@ pip install clearml-serving
 
 Clearml-Serving will automatically serve *published* models from your ClearML model repository, so the first step is getting a model into your ClearML model repository.  
 Background: When using `clearml` in your training code, any model stored by your python code is automatically registered (and, optionally, uploaded) to the model repository. This auto-magic logging is key for continuous model deployment.  
-To learn more on training models and the ClearML model repository, see the [ClearML documentation](https://allegro.ai/clearml/docs)
+To learn more on training models and the ClearML model repository, see the [ClearML documentation](https://clear.ml/docs/latest/docs/)
 
 ### Training a toy model with Keras (about 2 minutes on a laptop)
 
@@ -115,7 +115,7 @@ clearml-serving triton --endpoint "keras_mnist"  --model-project "examples" --mo
 
 3. Launch the serving service.  
    The service will be launched on your "services" queue, which by default runs services on the ClearML server machine.  
-   (Read more on services queue [here](https://allegro.ai/clearml/docs/docs/concepts_fundamentals/concepts_fundamentals_clearml_server.html#clearml-agent-services-container))  
+   (Read more on services queue [here](https://clear.ml/docs/latest/docs/clearml_agent#services-mode))  
    We set our serving-engine to launch on the "default" queue, 
 ```bash
 clearml-serving launch --queue default
@@ -123,7 +123,7 @@ clearml-serving launch --queue default
 
 4. Optional: If you do not have a machine connected to your ClearML cluster, either read more on our Kubernetes integration, or spin a bare-metal worker and connect it with your ClearML Server.  
    `clearml-serving` is leveraging the orchestration capabilities of `ClearML` to launch the serving engine on the cluster.  
-   Read more on the [ClearML Agent](https://github.com/allegroai/clearml-agent) orchestration module [here](https://allegro.ai/clearml/docs/docs/concepts_fundamentals/concepts_fundamentals_clearml_agent.html)  
+   Read more on the [ClearML Agent](https://github.com/allegroai/clearml-agent) orchestration module [here](https://clear.ml/docs/latest/docs/clearml_agent)  
    If you have not yet setup a ClearML worker connected to your `clearml` account, you can do this now using:
    ```bash
    pip install clearml-agent
