@@ -1,0 +1,7 @@
+clearml
+torch
+torchvision 
+Pillow
+nvidia-pyindex
+tritonclient
+requests
