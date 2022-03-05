@@ -5,7 +5,7 @@
 
 **ClearML Serving - Model deployment made easy**
 
-## **`clearml-serving` </br> Model Serving (ML/DL), Orchestration and Repository Made Easy**
+## **`clearml-serving` </br> Model Serving (ML/DL) Orchestration and Repository Made Easy**
 
 
 [![GitHub license](https://img.shields.io/github/license/allegroai/clearml-serving.svg)](https://img.shields.io/github/license/allegroai/clearml-serving.svg)
