@@ -61,7 +61,7 @@ Features:
 * Customizable
 * Open Source
 
-<a href="https://excalidraw.com/#json=v0ip945hun2SnO4HVLe0h,QKHfB04TFQLds3_4aqeBjQ"><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/design_diagram.png?raw=true" width="100%"></a>
+<a href="https://excalidraw.com/#json=v0ip945hun2SnO4HVLe0h,QKHfB04TFQLds3_4aqeBjQ"><img src="https://github.com/allegroai/clearml-serving/blob/dev/docs/design_diagram.png?raw=true" width="100%"></a>
 
 ## Installation
 
