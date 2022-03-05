@@ -48,41 +48,6 @@ class TensorBoardImage(TensorBoard):
         self.writer.add_summary(summary, epoch)
 
 
-def create_config_pbtxt(model, config_pbtxt_file):
-    platform = "tensorflow_savedmodel"
-    input_name = model.input_names[0]
-    output_name = model.output_names[0]
-    input_data_type = "TYPE_FP32"
-    output_data_type = "TYPE_FP32"
-    input_dims = str(model.input.shape.as_list()).replace("None", "-1")
-    output_dims = str(model.output.shape.as_list()).replace("None", "-1")
-
-    config_pbtxt = """
-        platform: "%s"
-        input [
-            {
-                name: "%s"
-                data_type: %s
-                dims: %s
-            }
-        ]
-        output [
-            {
-                name: "%s"
-                data_type: %s
-                dims: %s
-            }
-        ]
-    """ % (
-        platform,
-        input_name, input_data_type, input_dims,
-        output_name, output_data_type, output_dims
-    )
-
-    with open(config_pbtxt_file, "w") as config_file:
-        config_file.write(config_pbtxt)
-
-
 def main():
     parser = argparse.ArgumentParser(description='Keras MNIST Example - training CNN classification model')
     parser.add_argument('--batch-size', type=int, default=128, help='input batch size for training (default: 128)')
@@ -126,7 +91,7 @@ def main():
 
     # Connecting ClearML with the current process,
     # from here on everything is logged automatically
-    task = Task.init(project_name='examples', task_name='Keras MNIST serve example', output_uri=True)
+    task = Task.init(project_name='serving examples', task_name='train keras model', output_uri=True)
 
     # Advanced: setting model class enumeration
     labels = dict(('digit_%d' % i, i) for i in range(10))
@@ -154,12 +119,6 @@ def main():
 
     # store the model in a format that can be served
     model.save('serving_model', include_optimizer=False)
-
-    # create the config.pbtxt for triton to be able to serve the model
-    create_config_pbtxt(model=model, config_pbtxt_file='config.pbtxt')
-    # store the configuration on the creating Task,
-    # this will allow us to skip over manually setting the config.pbtxt for `clearml-serving`
-    task.connect_configuration(configuration=Path('config.pbtxt'), name='config.pbtxt')
 
     print('Test score: {}'.format(score[0]))
     print('Test accuracy: {}'.format(score[1]))

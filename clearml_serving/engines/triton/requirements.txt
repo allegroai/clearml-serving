@@ -1,0 +1,6 @@
+clearml >= 1.1.6
+clearml-serving
+tritonclient
+grpcio
+Pillow
+pathlib2

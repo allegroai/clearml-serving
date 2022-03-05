@@ -1,0 +1,14 @@
+clearml >= 1.1.6
+attrs
+fastapi[all]
+uvicorn[standard]
+gunicorn
+pyzmq
+asyncio
+aiocache
+tritonclient[grpc]
+numpy
+pandas
+scikit-learn
+grpcio
+Pillow
