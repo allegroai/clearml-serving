@@ -79,6 +79,9 @@ router = APIRouter(
 )
 
 
+# cover all routing options for model version `/{model_id}`, `/{model_id}/123`, `/{model_id}?version=123`
+@router.post("/{model_id}/{version}")
+@router.post("/{model_id}/")
 @router.post("/{model_id}")
 async def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
     try:

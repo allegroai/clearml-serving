@@ -17,14 +17,14 @@ The output will be a model created on the project "serving examples", by the nam
 2. Create model endpoint:
 
 `clearml-serving --id <service_id> model add --engine triton --endpoint "test_model_pytorch" --preprocess "examples/pytorch/preprocess.py" --name "train pytorch model" --project "serving examples"
-  --input-size 28 28 1 --input-name "INPUT__0" --input-type float32   
+  --input-size 1 28 28 --input-name "INPUT__0" --input-type float32   
   --output-size -1 10 --output-name "OUTPUT__0" --output-type float32   
 `
 
 Or auto update 
 
 `clearml-serving --id <service_id> model auto-update --engine triton --endpoint "test_model_pytorch_auto" --preprocess "examples/pytorch/preprocess.py" --name "train pytorch model" --project "serving examples" --max-versions 2
-  --input-size 28 28 1 --input-name "INPUT__0" --input-type float32   
+  --input-size 1 28 28 --input-name "INPUT__0" --input-type float32   
   --output-size -1 10 --output-name "OUTPUT__0" --output-type float32`
   
 Or add Canary endpoint
