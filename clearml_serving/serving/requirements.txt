@@ -12,3 +12,5 @@ pandas
 scikit-learn
 grpcio
 Pillow
+xgboost
+lightgbm

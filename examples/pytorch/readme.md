@@ -1,10 +1,11 @@
 # Train and Deploy Keras model with Nvidia Triton Engine
 
-## training mock model
+## training mnist digit classifier model
 
 Run the mock python training code
 ```bash
-python3 train_pytorch_mnist.py
+pip install -r examples/pytorch/requirements.txt 
+python examples/pytorch/train_pytorch_mnist.py
 ```
 
 The output will be a model created on the project "serving examples", by the name "train pytorch model"
@@ -14,12 +15,12 @@ The output will be a model created on the project "serving examples", by the nam
 
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint:
-`clearml-serving --id <service_id> model add --engine triton --endpoint "test_model_pytorch" --preprocess "preprocess.py" --name "train pytorch model" --project "serving examples"
+`clearml-serving --id <service_id> model add --engine triton --endpoint "test_model_pytorch" --preprocess "examples/pytorch/preprocess.py" --name "train pytorch model" --project "serving examples"
   --input-size 28 28 1 --input-name "INPUT__0" --input-type float32   
   --output-size -1 10 --output-name "OUTPUT__0" --output-type float32   
 `
 Or auto update 
-`clearml-serving --id <service_id> model auto-update --engine triton --endpoint "test_model_pytorch_auto" --preprocess "preprocess.py" --name "train pytorch model" --project "serving examples" --max-versions 2
+`clearml-serving --id <service_id> model auto-update --engine triton --endpoint "test_model_pytorch_auto" --preprocess "examples/pytorch/preprocess.py" --name "train pytorch model" --project "serving examples" --max-versions 2
   --input-size 28 28 1 --input-name "INPUT__0" --input-type float32   
   --output-size -1 10 --output-name "OUTPUT__0" --output-type float32   
 `
@@ -35,15 +36,3 @@ Or add Canary endpoint
 > **_Notice:_**  You can also change the serving service while it is already running!
 This includes adding/removing endpoints, adding canary model routing etc.
 
-
-### Running / debugging the serving service manually
-Once you have setup the Serving Service Task
-
-```bash
-$ pip3 install -r clearml_serving/serving/requirements.txt
-$ CLEARML_SERVING_TASK_ID=<service_id> PYHTONPATH=$(pwd) python3 -m gunicorn \
-    --preload clearml_serving.serving.main:app \ 
-    --workers 4 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:8080
-```

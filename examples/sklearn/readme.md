@@ -1,10 +1,11 @@
 # Train and Deploy Scikit-Learn model
 
-## training mock model
+## training mock logistic regression model
 
 Run the mock python training code
 ```bash
-python3 train_model.py
+pip install -r examples/sklearn/requirements.txt 
+python examples/sklearn/train_model.py
 ```
 
 The output will be a model created on the project "serving examples", by the name "train sklearn model"
@@ -13,9 +14,9 @@ The output will be a model created on the project "serving examples", by the nam
 
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint: 
-`clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn" --preprocess "preprocess.py" --name "train sklearn model" --project "serving examples"`
+`clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples"`
 Or auto update 
-`clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "preprocess.py" --name "train sklearn model" --project "serving examples" --max-versions 2`
+`clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples" --max-versions 2`
 Or add Canary endpoint
 `clearml-serving --id <service_id> model canary --endpoint "test_model_sklearn_auto" --weights 0.1 0.9 --input-endpoint-prefix test_model_sklearn_auto`
 
@@ -24,16 +25,3 @@ Or add Canary endpoint
 
 > **_Notice:_**  You can also change the serving service while it is already running!
 This includes adding/removing endpoints, adding canary model routing etc.
-
-
-### Running / debugging the serving service manually
-Once you have setup the Serving Service Task
-
-```bash
-$ pip3 install -r clearml_serving/serving/requirements.txt
-$ CLEARML_SERVING_TASK_ID=<service_id> PYHTONPATH=$(pwd) python3 -m gunicorn \
-    --preload clearml_serving.serving.main:app \ 
-    --workers 4 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:8080
-```

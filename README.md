@@ -248,7 +248,7 @@ Example:
   - `curl -X POST "http://127.0.0.1:8080/serve/test_model" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'` 
 
 
-### Model inference Examples
+### Model Serving Examples
 
 - Scikit-Learn [example](examples/sklearn/readme.md) - random data 
 - XGBoost [example](examples/xgboost/readme.md) - iris dataset
