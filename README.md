@@ -61,7 +61,7 @@ Features:
 
 ## Installation
 
-### Concepts
+### :information_desk_person: Concepts
 
 **CLI** - Secure configuration interface for on-line model upgrade/deployment on running Serving Services
 
@@ -84,7 +84,7 @@ Features:
 * CLI : Configuration & model deployment interface
 
 
-### Initial Setup
+### :nail_care: Initial Setup
 
 1. Setup your [**ClearML Server**](https://github.com/allegroai/clearml-server) or use the [Free tier Hosting](https://app.community.clear.ml)
 2. Install the CLI on your  laptop `clearml` and `clearml-serving`
@@ -95,7 +95,7 @@ Features:
   - The new serving service UID should be printed `"New Serving Service created: id=aa11bb22aa11bb22`
 4. Write down the Serving Service UID
 
-### Toy model (scikit learn) deployment example 
+### :point_right: Toy model (scikit learn) deployment example 
 
 1. Train toy scikit-learn model
   - create new python virtual environment
@@ -124,7 +124,7 @@ Features:
 > To learn more on training models and the ClearML model repository, see the [ClearML documentation](https://clear.ml/docs)
 
 
-### Nvidia Triton serving engine setup
+### :muscle: Nvidia Triton serving engine setup
 
 Nvidia Triton Serving Engine is used by clearml-serving to do the heavy lifting of deep-learning models on both GPU & CPU nodes. 
 Inside the Triton container a clearml controller is spinning and monitoring the Triton server.
@@ -151,7 +151,7 @@ Now eny model that will register with "Triton" engine, will run the pre/post pro
 See Tensorflow [example](examples/keras/readme.md) and Pytorch [example](examples/pytorch/readme.md) for further details.
 
 
-### Container Configuration Variables 
+### :ocean: Container Configuration Variables 
 
 When spinning the Inference container or the Triton Engine container, 
 we need to specify the `clearml-server` address and access credentials
@@ -178,7 +178,7 @@ AZURE_STORAGE_ACCOUNT
 AZURE_STORAGE_KEY
 ```
 
-### Registering & Deploying new models manually 
+### :turtle: Registering & Deploying new models manually 
 
 Uploading an existing model file into the model repository can be done via the `clearml` RestAPI, the python interface, or with the `clearml-serving` CLI 
 
@@ -196,7 +196,7 @@ Uploading an existing model file into the model repository can be done via the `
 `--destination="s3://bucket/folder"`, `gs://bucket/folder`, `azure://bucket/folder`. Yhere is no need to provide a unique path tp the destination argument, the location of the model will be a unique path based on the serving service ID and the model name
 
 
-### Automatic model deployment
+### :rabbit: Automatic model deployment
 
 The clearml Serving Service support automatic model deployment and upgrades, directly connected with the model repository and API. When the model auto-deploy is configured, a new model versions will be automatically deployed when you "publish" or "tag" a new model in the `clearml` model repository. This automation interface allows for simpler CI/CD model deployment process, as a single API automatically deploy (or remove) a model from the Serving Service.
 
@@ -214,9 +214,9 @@ from clearml import Model
 Model(model_id="unique_model_id_here").publish()
 ```
 4. The new model is available on a new endpoint version (1), test with: 
-`curl -X POST "http://127.0.0.1:8080/serve/test_model_sklearn_auto/1" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'
+`curl -X POST "http://127.0.0.1:8080/serve/test_model_sklearn_auto/1" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'`
 
-### Canary endpoint setup
+### :bird: Canary endpoint setup
 
 Canary endpoint deployment add a new endpoint where the actual request is sent to a preconfigured set of endpoints with pre-provided distribution. For example, let's create a new endpoint "test_model_sklearn_canary", we can provide a list of endpoints and probabilities (weights).
 
@@ -248,7 +248,7 @@ Example:
   - `curl -X POST "http://127.0.0.1:8080/serve/test_model" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'` 
 
 
-### Model Serving Examples
+### :fire: Model Serving Examples
 
 - Scikit-Learn [example](examples/sklearn/readme.md) - random data 
 - XGBoost [example](examples/xgboost/readme.md) - iris dataset
@@ -256,7 +256,7 @@ Example:
 - PyTorch [example](examples/pytorch/readme.md) - mnist dataset
 - TensorFlow/Keras [example](examples/keras/readme.md) - mnist dataset
 
-### Status
+### :pray: Status
 
   - [x] FastAPI integration for inference service
   - [x] multi-process Gunicorn for inference service
