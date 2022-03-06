@@ -16,9 +16,13 @@ The output will be a model created on the project "serving examples", by the nam
 2. Create model endpoint: 
 
 3. `clearml-serving --id <service_id> model add --engine xgboost --endpoint "test_model_xgb" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model" --project "serving examples"`
+
 Or auto update 
+
 `clearml-serving --id <service_id> model auto-update --engine xgboost --endpoint "test_model_xgb_auto" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model" --project "serving examples" --max-versions 2`
+
 Or add Canary endpoint
+
 `clearml-serving --id <service_id> model canary --endpoint "test_model_xgb_auto" --weights 0.1 0.9 --input-endpoint-prefix test_model_xgb_auto`
 
 4. Run the clearml-serving container `docker run -v ~/clearml.conf:/root/clearml.conf -p 8080:8080 -e CLEARML_SERVING_TASK_ID=<service_id> clearml-serving:latest`
