@@ -251,10 +251,12 @@ Example:
 ### :fire: Model Serving Examples
 
 - Scikit-Learn [example](examples/sklearn/readme.md) - random data 
+- Scikit-Learn Model Ensemble [example](examples/ensemble/readme.md) - random data 
 - XGBoost [example](examples/xgboost/readme.md) - iris dataset
 - LightGBM [example](examples/lightgbm/readme.md) - iris dataset
 - PyTorch [example](examples/pytorch/readme.md) - mnist dataset
 - TensorFlow/Keras [example](examples/keras/readme.md) - mnist dataset
+- Model Pipeline [example](examples/pipeline/readme.md) - random data
 
 ### :pray: Status
 
@@ -279,8 +281,8 @@ Example:
   - [x] LightGBM example
   - [x] PyTorch example
   - [x] TensorFlow/Keras example
-  - [ ] Model ensemble example
-  - [ ] Model pipeline example
+  - [x] Model ensemble example
+  - [x] Model pipeline example
   - [ ] Statistics Service
   - [ ] Kafka install instructions
   - [ ] Prometheus install instructions

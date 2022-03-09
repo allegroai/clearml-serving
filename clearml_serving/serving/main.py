@@ -19,7 +19,7 @@ class GzipRequest(Request):
             body = await super().body()
             if "gzip" in self.headers.getlist("Content-Encoding"):
                 body = gzip.decompress(body)
-            self._body = body
+            self._body = body  # noqa
         return self._body
 
 
@@ -83,7 +83,7 @@ router = APIRouter(
 @router.post("/{model_id}/{version}")
 @router.post("/{model_id}/")
 @router.post("/{model_id}")
-async def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
+def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
     try:
         return_value = processor.process_request(
             base_url=model_id,

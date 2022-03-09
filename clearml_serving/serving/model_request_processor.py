@@ -8,25 +8,10 @@ import threading
 from multiprocessing import Lock
 from numpy.random import choice
 
-from attr import attrib, attrs, asdict
 from clearml import Task, Model
 from clearml.storage.util import hash_dict
-from .preprocess_service import ModelEndpoint, ModelMonitoring, BasePreprocessRequest
-
-
-@attrs
-class CanaryEP(object):
-    endpoint = attrib(type=str)  # load balancer endpoint
-    weights = attrib(type=list)  # list of weights (order should be matching fixed_endpoints or prefix)
-    load_endpoints = attrib(type=list, default=[])  # list of endpoints to balance and route
-    load_endpoint_prefix = attrib(
-        type=str, default=None)  # endpoint prefix to list
-    # (any endpoint starting with this prefix will be listed, sorted lexicographically, or broken into /<int>)
-
-    def as_dict(self, remove_null_entries=False):
-        if not remove_null_entries:
-            return asdict(self)
-        return {k: v for k, v in asdict(self).items() if v is not None}
+from .preprocess_service import BasePreprocessRequest
+from .endpoints import ModelEndpoint, ModelMonitoring, CanaryEP
 
 
 class FastWriteCounter(object):
@@ -98,6 +83,7 @@ class ModelRequestProcessor(object):
                 sleep(1)
             # retry to process
             return self.process_request(base_url=base_url, version=version, request_body=request_body)
+
         try:
             # normalize url and version
             url = self._normalize_endpoint_url(base_url, version)
@@ -120,9 +106,8 @@ class ModelRequestProcessor(object):
                 self._engine_processor_lookup[url] = processor
 
             return_value = self._process_request(processor=processor, url=url, body=request_body)
-        except Exception:
+        finally:
             self._request_processing_state.dec()
-            raise
 
         return return_value
 
@@ -194,7 +179,7 @@ class ModelRequestProcessor(object):
         if url in self._endpoints:
             print("Warning: Model endpoint \'{}\' overwritten".format(url))
 
-        if not endpoint.model_id:
+        if not endpoint.model_id and any([model_project, model_name, model_tags]):
             model_query = dict(
                 project_name=model_project,
                 model_name=model_name,
@@ -208,6 +193,8 @@ class ModelRequestProcessor(object):
             if len(models) > 1:
                 print("Warning: Found multiple Models for \'{}\', selecting id={}".format(model_query, models[0].id))
             endpoint.model_id = models[0].id
+        elif not endpoint.model_id:
+            print("Warning: No Model provided for \'{}\'".format(url))
 
         # upload as new artifact
         if preprocess_code:
@@ -236,6 +223,11 @@ class ModelRequestProcessor(object):
         """
         if not isinstance(monitoring, ModelMonitoring):
             monitoring = ModelMonitoring(**monitoring)
+
+        # make sure we actually have something to monitor
+        if not any([monitoring.monitor_project, monitoring.monitor_name, monitoring.monitor_tags]):
+            raise ValueError("Model monitoring requires at least a "
+                             "project / name / tag to monitor, none were provided.")
 
         # make sure we have everything configured
         self._validate_model(monitoring)
@@ -383,6 +375,10 @@ class ModelRequestProcessor(object):
 
             # release stall lock
             self._update_lock_flag = False
+
+            # update the state on the inference task
+            if Task.current_task() and Task.current_task().id != self._task.id:
+                self.serialize(task=Task.current_task())
 
         return True
 
@@ -878,7 +874,7 @@ class ModelRequestProcessor(object):
         return task
 
     @classmethod
-    def _normalize_endpoint_url(cls, endpoint: str, version : Optional[str] = None) -> str:
+    def _normalize_endpoint_url(cls, endpoint: str, version: Optional[str] = None) -> str:
         return "{}/{}".format(endpoint.rstrip("/"), version or "").rstrip("/")
 
     @classmethod

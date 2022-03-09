@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from clearml_serving.serving.model_request_processor import ModelRequestProcessor, CanaryEP
-from clearml_serving.serving.preprocess_service import ModelMonitoring, ModelEndpoint
+from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint
 
 verbosity = False
 
@@ -92,8 +92,8 @@ def func_model_remove(args):
     elif request_processor.remove_canary_endpoint(endpoint_url=args.endpoint):
         print("Removing model canary endpoint: {}".format(args.endpoint))
     else:
-        print("Error: Could not find base endpoint URL: {}".format(args.endpoint))
-        return
+        raise ValueError("Could not find base endpoint URL: {}".format(args.endpoint))
+
     print("Updating serving service")
     request_processor.serialize()
 
@@ -111,8 +111,7 @@ def func_canary_add(args):
                 load_endpoint_prefix=args.input_endpoint_prefix,
             )
     ):
-        print("Error: Could not add canary endpoint URL: {}".format(args.endpoint))
-        return
+        raise ValueError("Could not add canary endpoint URL: {}".format(args.endpoint))
 
     print("Updating serving service")
     request_processor.serialize()
@@ -152,7 +151,8 @@ def func_model_auto_update_add(args):
         ),
         preprocess_code=args.preprocess
     ):
-        print("Error: Could not find base endpoint URL: {}".format(args.endpoint))
+        raise ValueError("Could not find base endpoint URL: {}".format(args.endpoint))
+
     print("Updating serving service")
     request_processor.serialize()
 
@@ -192,7 +192,8 @@ def func_model_endpoint_add(args):
         model_tags=args.tags or None,
         model_published=args.published,
     ):
-        print("Error: Could not find base endpoint URL: {}".format(args.endpoint))
+        raise ValueError("Could not find base endpoint URL: {}".format(args.endpoint))
+
     print("Updating serving service")
     request_processor.serialize()
 

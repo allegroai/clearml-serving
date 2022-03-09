@@ -1,73 +1,20 @@
-import numpy as np
+import os
 from typing import Optional, Any, Callable, List
 
-from attr import attrib, attrs, asdict
-
+import numpy as np
 from clearml import Task, Model
 from clearml.binding.artifacts import Artifacts
 from clearml.storage.util import sha256sum
+from requests import post as request_post
 
-
-def _engine_validator(inst, attr, value):  # noqa
-    if not BasePreprocessRequest.validate_engine_type(value):
-        raise TypeError("{} not supported engine type".format(value))
-
-
-def _matrix_type_validator(inst, attr, value):  # noqa
-    if value and not np.dtype(value):
-        raise TypeError("{} not supported matrix type".format(value))
-
-
-@attrs
-class ModelMonitoring(object):
-    base_serving_url = attrib(type=str)  # serving point url prefix (example: "detect_cat")
-    monitor_project = attrib(type=str)  # monitor model project (for model auto update)
-    monitor_name = attrib(type=str)  # monitor model name (for model auto update, regexp selection)
-    monitor_tags = attrib(type=list)  # monitor model tag (for model auto update)
-    engine_type = attrib(type=str, validator=_engine_validator)  # engine type
-    only_published = attrib(type=bool, default=False)  # only select published models
-    max_versions = attrib(type=int, default=None)  # Maximum number of models to keep serving (latest X models)
-    input_size = attrib(type=list, default=None)  # optional,  model matrix size
-    input_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    input_name = attrib(type=str, default=None)  # optional, layer name to push the input to
-    output_size = attrib(type=list, default=None)  # optional, model matrix size
-    output_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    output_name = attrib(type=str, default=None)  # optional, layer name to pull the results from
-    preprocess_artifact = attrib(
-        type=str, default=None)  # optional artifact name storing the model preprocessing code
-    auxiliary_cfg = attrib(type=dict, default=None)  # Auxiliary configuration (e.g. triton conf), Union[str, dict]
-
-    def as_dict(self, remove_null_entries=False):
-        if not remove_null_entries:
-            return asdict(self)
-        return {k: v for k, v in asdict(self).items() if v is not None}
-
-
-@attrs
-class ModelEndpoint(object):
-    engine_type = attrib(type=str, validator=_engine_validator)  # engine type
-    serving_url = attrib(type=str)  # full serving point url (including version) example: "detect_cat/v1"
-    model_id = attrib(type=str)  # list of model IDs to serve (order implies versions first is v1)
-    version = attrib(type=str, default="")  # key (version string), default no version
-    preprocess_artifact = attrib(
-        type=str, default=None)  # optional artifact name storing the model preprocessing code
-    input_size = attrib(type=list, default=None)  # optional,  model matrix size
-    input_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    input_name = attrib(type=str, default=None)  # optional, layer name to push the input to
-    output_size = attrib(type=list, default=None)  # optional, model matrix size
-    output_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    output_name = attrib(type=str, default=None)  # optional, layer name to pull the results from
-    auxiliary_cfg = attrib(type=dict, default=None)  # Optional: Auxiliary configuration (e.g. triton conf), [str, dict]
-
-    def as_dict(self, remove_null_entries=False):
-        if not remove_null_entries:
-            return asdict(self)
-        return {k: v for k, v in asdict(self).items() if v is not None}
+from .endpoints import ModelEndpoint
 
 
 class BasePreprocessRequest(object):
     __preprocessing_lookup = {}
     __preprocessing_modules = set()
+    _default_serving_base_url = "http://127.0.0.1:8080/serve/"
+    _timeout = None  # timeout in seconds for the entire request, set in __init__
 
     def __init__(
             self,
@@ -83,6 +30,8 @@ class BasePreprocessRequest(object):
         self._preprocess = None
         self._model = None
         self._server_config = server_config or {}
+        if self._timeout is None:
+            self._timeout = int(float(os.environ.get('GUNICORN_SERVING_TIMEOUT', 600)) * 0.8)
         # load preprocessing code here
         if self.model_endpoint.preprocess_artifact:
             if not task or self.model_endpoint.preprocess_artifact not in task.artifacts:
@@ -111,7 +60,10 @@ class BasePreprocessRequest(object):
                     spec = importlib.util.spec_from_file_location("Preprocess", path)
                     _preprocess = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(_preprocess)
-                    self._preprocess = _preprocess.Preprocess()  # noqa
+                    Preprocess = _preprocess.Preprocess  # noqa
+                    # override `send_request` method
+                    Preprocess.send_request = BasePreprocessRequest._preprocess_send_request
+                    self._preprocess = Preprocess()
                     self._preprocess.serving_config = server_config or {}
                     if callable(getattr(self._preprocess, 'load', None)):
                         self._model = self._preprocess.load(self._get_local_model_file())
@@ -125,7 +77,7 @@ class BasePreprocessRequest(object):
         Raise exception to report an error
         Return value will be passed to serving engine
         """
-        if self._preprocess is not None:
+        if self._preprocess is not None and hasattr(self._preprocess, 'preprocess'):
             return self._preprocess.preprocess(request)
         return request
 
@@ -135,7 +87,7 @@ class BasePreprocessRequest(object):
         Raise exception to report an error
         Return value will be passed to serving engine
         """
-        if self._preprocess is not None:
+        if self._preprocess is not None and hasattr(self._preprocess, 'postprocess'):
             return self._preprocess.postprocess(data)
         return data
 
@@ -162,6 +114,7 @@ class BasePreprocessRequest(object):
         """
         A decorator to register an annotation type name for classes deriving from Annotation
         """
+
         def wrapper(cls):
             cls.__preprocessing_lookup[engine_name] = cls
             return cls
@@ -180,6 +133,17 @@ class BasePreprocessRequest(object):
                 importlib.import_module(m)
             except (ImportError, TypeError):
                 pass
+
+    @staticmethod
+    def _preprocess_send_request(self, endpoint: str, version: str = None, data: dict = None) -> Optional[dict]:
+        endpoint = "{}/{}".format(endpoint.strip("/"), version.strip("/")) if version else endpoint.strip("/")
+        base_url = self.serving_config.get("base_serving_url") if self.serving_config else None
+        base_url = (base_url or BasePreprocessRequest._default_serving_base_url).strip("/")
+        url = "{}/{}".format(base_url, endpoint.strip("/"))
+        return_value = request_post(url, json=data, timeout=BasePreprocessRequest._timeout)
+        if not return_value.ok:
+            return None
+        return return_value.json()
 
 
 @BasePreprocessRequest.register_engine("triton", modules=["grpc", "tritonclient"])
@@ -224,7 +188,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         Detect gRPC server and send the request to it
         """
         # allow to override bt preprocessing class
-        if self._preprocess is not None and getattr(self._preprocess, "process", None):
+        if self._preprocess is not None and hasattr(self._preprocess, "process"):
             return self._preprocess.process(data)
 
         # Create gRPC stub for communicating with the server
@@ -268,7 +232,11 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         output0.name = self.model_endpoint.output_name
 
         request.outputs.extend([output0])
-        response = grpc_stub.ModelInfer(request, compression=self._ext_grpc.Compression.Gzip)
+        response = grpc_stub.ModelInfer(
+            request,
+            compression=self._ext_grpc.Compression.Gzip,
+            timeout=self._timeout
+        )
 
         output_results = []
         index = 0
@@ -351,6 +319,6 @@ class CustomPreprocessRequest(BasePreprocessRequest):
         The actual processing function.
         We run the process in this context
         """
-        if self._preprocess is not None:
+        if self._preprocess is not None and hasattr(self._preprocess, 'process'):
             return self._preprocess.process(data)
         return None

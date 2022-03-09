@@ -2,17 +2,18 @@ import os
 import re
 import shutil
 import subprocess
-import numpy as np
 from argparse import ArgumentParser
 from time import time
 from typing import Optional
 
-from pathlib2 import Path
-
+import numpy as np
 from clearml import Task, Logger, InputModel
 from clearml.backend_api.utils import get_http_session_with_retry
-from clearml_serving.serving.model_request_processor import ModelRequestProcessor, ModelEndpoint
 from clearml.utilities.pyhocon import ConfigFactory, ConfigTree, HOCONConverter
+from pathlib2 import Path
+
+from clearml_serving.serving.endpoints import ModelEndpoint
+from clearml_serving.serving.model_request_processor import ModelRequestProcessor
 
 
 class TritonHelper(object):
@@ -268,6 +269,7 @@ class TritonHelper(object):
         Full spec available here:
         https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md
         """
+
         def _convert_lists(config):
             if isinstance(config, list):
                 return [_convert_lists(i) for i in config]
@@ -346,7 +348,7 @@ class TritonHelper(object):
         if config_dict:
             config_dict = _convert_lists(config_dict)
             # Convert HOCON standard to predefined message format
-            config_pbtxt = "\n" + HOCONConverter.to_hocon(config_dict).\
+            config_pbtxt = "\n" + HOCONConverter.to_hocon(config_dict). \
                 replace("=", ":").replace(" : ", ": ")
             # conform types (remove string quotes)
             if input_type:
