@@ -47,12 +47,16 @@ except (ValueError, TypeError):
 # get the serving controller task
 # noinspection PyProtectedMember
 serving_task = ModelRequestProcessor._get_control_plane_task(task_id=serving_service_task_id)
+# set to running (because we are here)
+if serving_task.status != "in_progress":
+    serving_task.started(force=True)
 # create a new serving instance (for visibility and monitoring)
 instance_task = Task.init(
     project_name=serving_task.get_project_name(),
     task_name="{} - serve instance".format(serving_task.name),
     task_type="inference",
 )
+instance_task.set_system_tags(["service"])
 processor = None  # type: Optional[ModelRequestProcessor]
 # preload modules into memory before forking
 BasePreprocessRequest.load_modules()

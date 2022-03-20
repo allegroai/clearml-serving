@@ -2,6 +2,7 @@
 dist/
 build/
 *.egg-info/
+.tmp/
 
 
 # Compiled Python bytecode
@@ -23,6 +24,12 @@ Thumbs.db
 *.app
 *.exe
 *.war
+*.pkl
+*.pt
+*.pb
+data/
+runs/
+variables/
 
 # Large media files
 *.mp4

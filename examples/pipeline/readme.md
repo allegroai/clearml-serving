@@ -24,3 +24,4 @@ Training a scikit-learn model (see example/sklearn)
 
 > **_Notice:_**  You can also change the serving service while it is already running!
 This includes adding/removing endpoints, adding canary model routing etc.
+by default new endpoints/models will be automatically updated after 1 minute

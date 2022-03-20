@@ -4,9 +4,76 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from clearml_serving.serving.model_request_processor import ModelRequestProcessor, CanaryEP
-from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint
+from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint, EndpointMetricLogging
 
 verbosity = False
+
+
+def func_metric_ls(args):
+    request_processor = ModelRequestProcessor(task_id=args.id)
+    print("List endpoint metrics, control task id={}".format(request_processor.get_id()))
+    request_processor.deserialize(skip_sync=True)
+    print("Logged Metrics:\n{}".format(
+        json.dumps({k: v.as_dict() for k, v in request_processor.list_metric_logging().items()}, indent=2)))
+
+
+def func_metric_rm(args):
+    request_processor = ModelRequestProcessor(task_id=args.id)
+    print("Serving service Task {}, Removing metrics from endpoint={}".format(
+        request_processor.get_id(), args.endpoint))
+    request_processor.deserialize(skip_sync=True)
+    for v in (args.variable or []):
+        if request_processor.remove_metric_logging(endpoint=args.endpoint, variable_name=v):
+            print("Removing static endpoint: {}".format(args.endpoint))
+        else:
+            raise ValueError("Could not remove {} from endpoin {}".format(v, args.endpoint))
+    print("Updating serving service")
+    request_processor.serialize()
+
+
+def func_metric_add(args):
+    request_processor = ModelRequestProcessor(task_id=args.id)
+    print("Serving service Task {}, Adding metric logging endpoint \'/{}/\'".format(
+        request_processor.get_id(), args.endpoint))
+    request_processor.deserialize(skip_sync=True)
+    metric = EndpointMetricLogging(endpoint=args.endpoint)
+    if args.log_freq is not None:
+        metric.log_frequency = float(args.log_freq)
+    for v in (args.variable_scalar or []):
+        if '=' not in v:
+            raise ValueError("Variable '{}' should be in the form of <name>=<buckets> "
+                             "example: x1=0,1,2,3,4,5".format(v))
+        name, buckets = v.split('=', 1)
+        if name in metric.metrics:
+            print("Warning: {} defined twice".format(name))
+        if '/' in buckets:
+            b_min, b_max, b_step = [float(b.strip()) for b in buckets.split('/', 2)]
+            buckets = list(range(b_min, b_max, b_step))
+        else:
+            buckets = [float(b.strip()) for b in buckets.split(',')]
+        metric.metrics[name] = dict(type="scalar", buckets=buckets)
+
+    for v in (args.variable_enum or []):
+        if '=' not in v:
+            raise ValueError("Variable '{}' should be in the form of <name>=<buckets> "
+                             "example: x1=cat,dog,sheep".format(v))
+        name, buckets = v.split('=', 1)
+        if name in metric.metrics:
+            print("Warning: {} defined twice".format(name))
+        buckets = [str(b.strip()) for b in buckets.split(',')]
+        metric.metrics[name] = dict(type="enum", buckets=buckets)
+
+    for v in (args.variable_value or []):
+        name = v.strip()
+        if name in metric.metrics:
+            print("Warning: {} defined twice".format(name))
+        metric.metrics[name] = dict(type="variable", buckets=None)
+
+    if not request_processor.add_metric_logging(metric=metric):
+        raise ValueError("Could not add metric logging endpoint {}".format(args.endpoint))
+
+    print("Updating serving service")
+    request_processor.serialize()
 
 
 def func_model_upload(args):
@@ -46,9 +113,12 @@ def func_model_ls(args):
     request_processor = ModelRequestProcessor(task_id=args.id)
     print("List model serving and endpoints, control task id={}".format(request_processor.get_id()))
     request_processor.deserialize(skip_sync=True)
-    print("Endpoints:\n{}".format(json.dumps(request_processor.get_endpoints(), indent=2)))
-    print("Model Monitoring:\n{}".format(json.dumps(request_processor.get_model_monitoring(), indent=2)))
-    print("Canary:\n{}".format(json.dumps(request_processor.get_canary_endpoints(), indent=2)))
+    print("Endpoints:\n{}".format(
+        json.dumps({k: v.as_dict() for k, v in request_processor.get_endpoints().items()}, indent=2)))
+    print("Model Monitoring:\n{}".format(
+        json.dumps({k: v.as_dict() for k, v in request_processor.get_model_monitoring().items()}, indent=2)))
+    print("Canary:\n{}".format(
+        json.dumps({k: v.as_dict() for k, v in request_processor.get_canary_endpoints().items()}, indent=2)))
 
 
 def func_create_service(args):
@@ -69,6 +139,10 @@ def func_config_service(args):
         print("Configuring serving service [id={}] triton_grpc_server={}".format(
             request_processor.get_id(), args.triton_grpc_server))
         request_processor.configure(external_triton_grpc_server=args.triton_grpc_server)
+    if args.kafka_metric_server:
+        request_processor.configure(external_kafka_service_server=args.kafka_metric_server)
+    if args.metric_log_freq is not None:
+        pass
 
 
 def func_list_services(_):
@@ -224,6 +298,47 @@ def cli():
         help='[Optional] Specify project for the serving service. Default: DevOps')
     parser_create.set_defaults(func=func_create_service)
 
+    parser_metrics = subparsers.add_parser('metrics', help='Configure inference metrics Service')
+    parser_metrics.set_defaults(func=parser_metrics.print_help)
+
+    metric_cmd = parser_metrics.add_subparsers(help='model metric command help')
+
+    parser_metrics_add = metric_cmd.add_parser('add', help='Add/modify metric for a specific endpoint')
+    parser_metrics_add.add_argument(
+        '--endpoint', type=str, required=True,
+        help='metric endpoint name including version, e.g. "model/1" or a prefix "model/*" '
+             'Notice: it will override any previous endpoint logged metrics')
+    parser_metrics_add.add_argument(
+        '--log-freq', type=float,
+        help='Optional: logging request frequency, between 0.0 to 1.0 '
+             'example: 1.0 means all requests are logged, 0.5 means half of the requests are logged '
+             'if not specified, use global logging frequency, see `config --metric-log-freq`')
+    parser_metrics_add.add_argument(
+        '--variable-scalar', type=str, nargs='+',
+        help='Add float (scalar) argument to the metric logger, '
+             '<name>=<histogram> example with specific buckets: "x1=0,0.2,0.4,0.6,0.8,1" or '
+             'with min/max/num_buckets "x1=0.0/1.0/5"')
+    parser_metrics_add.add_argument(
+        '--variable-enum', type=str, nargs='+',
+        help='Add enum (string) argument to the metric logger, '
+             '<name>=<optional_values> example: "detect=cat,dog,sheep"')
+    parser_metrics_add.add_argument(
+        '--variable-value', type=str, nargs='+',
+        help='Add non-samples scalar argument to the metric logger, '
+             '<name> example: "latency"')
+    parser_metrics_add.set_defaults(func=func_metric_add)
+
+    parser_metrics_rm = metric_cmd.add_parser('remove', help='Remove metric from a specific endpoint')
+    parser_metrics_rm.add_argument(
+        '--endpoint', type=str, help='metric endpoint name including version, e.g. "model/1" or a prefix "model/*"')
+    parser_metrics_rm.add_argument(
+        '--variable', type=str, nargs='+',
+        help='Remove (scalar/enum) argument from the metric logger, <name> example: "x1"')
+    parser_metrics_rm.set_defaults(func=func_metric_rm)
+
+    parser_metrics_ls = metric_cmd.add_parser('list', help='list metrics logged on all endpoints')
+    parser_metrics_ls.set_defaults(func=func_metric_ls)
+
     parser_config = subparsers.add_parser('config', help='Configure a new Serving Service')
     parser_config.add_argument(
         '--base-serving-url', type=str,
@@ -231,6 +346,12 @@ def cli():
     parser_config.add_argument(
         '--triton-grpc-server', type=str,
         help='External ClearML-Triton serving container gRPC address. example: 127.0.0.1:9001')
+    parser_config.add_argument(
+        '--kafka-metric-server', type=str,
+        help='External Kafka service url. example: 127.0.0.1:9092')
+    parser_config.add_argument(
+        '--metric-log-freq', type=float,
+        help='Set default metric logging frequency. 1.0 is 100% of all requests are logged')
     parser_config.set_defaults(func=func_config_service)
 
     parser_model = subparsers.add_parser('model', help='Configure Model endpoints for an already running Service')
@@ -273,7 +394,7 @@ def cli():
              'https://domain/model.bin)')
     parser_model_upload.add_argument(
         '--destination', type=str,
-        help='Optional, Specifying the target destination for the model to be uploaded'
+        help='Optional, Specifying the target destination for the model to be uploaded '
              '(e.g. s3://bucket/folder/, gs://bucket/folder/, azure://bucket/folder/)')
     parser_model_upload.set_defaults(func=func_model_upload)
 

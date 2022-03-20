@@ -61,6 +61,73 @@ Features:
 
 ## Installation
 
+### prerequisites
+
+* ClearML-Server : Model repository, Service Health, Control plane
+* Kubernetes / Single-instance Machine : Deploying containers 
+* CLI : Configuration & model deployment interface
+
+### :nail_care: Initial Setup
+
+1. Setup your [**ClearML Server**](https://github.com/allegroai/clearml-server) or use the [Free tier Hosting](https://app.clear.ml)
+2. Setup local access (if you haven't already), see introductions [here](https://clear.ml/docs/latest/docs/getting_started/ds/ds_first_steps#install-clearml)
+3. Install clearml-serving CLI: 
+```bash
+pip3 istall clearml-serving
+```
+4. Create the Serving Service Controller
+  - `clearml-serving create --name "serving example"`
+  - The new serving service UID should be printed `"New Serving Service created: id=aa11bb22aa11bb22`
+5. Write down the Serving Service UID
+6. Clone clearml-serving repository
+```bash
+git clone https://github.com/allegroai/clearml-serving.git
+```
+7. Edit the environment variables file (`docker/example.env`) with your clearml-server credentials and Serving Service UID. For example, you should have something like
+```bash
+cat docker/example.env
+```
+```bash
+  CLEARML_WEB_HOST="https://app.clear.ml"
+  CLEARML_API_HOST="https://api.clear.ml"
+  CLEARML_FILES_HOST="https://files.clear.ml"
+  CLEARML_API_ACCESS_KEY="<access_key_here>"
+  CLEARML_API_SECRET_KEY="<secret_key_here>"
+  CLEARML_SERVING_TASK_ID="<serving_service_id_here>"
+```
+8. Spin the clearml-serving containers with docker-compose (or if running on Kubernetes use the helm chart)
+```bash
+cd docker && docker-compose --env-file example.env -f docker-compose.yml up 
+```
+If you need Triton support (keras/pytorch/onnx etc.), use the triton docker-compose file
+```bash
+cd docker && docker-compose --env-file example.env -f docker-compose-triton.yml up 
+```
+:muscle: If running on a GPU instance w/ Triton support (keras/pytorch/onnx etc.), use the triton gpu docker-compose file
+```bash
+cd docker && docker-compose --env-file example.env -f docker-compose-triton-gpu.yml up 
+```
+
+> **Notice**: Any model that registers with "Triton" engine, will run the pre/post processing code on the Inference service container, and the model inference itself will be executed on the Triton Engine container.
+
+
+### :ocean: Optional: advanced setup - S3/GS/Azure access
+
+To add access credentials and allow the inference containers to download models from your S3/GS/Azure object-storage,
+add the respected environment variables to your env files (`example.env`)
+See further details on configuring the storage access [here](https://clear.ml/docs/latest/docs/integrations/storage#configuring-storage)
+
+```bash
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_DEFAULT_REGION
+
+GOOGLE_APPLICATION_CREDENTIALS
+
+AZURE_STORAGE_ACCOUNT
+AZURE_STORAGE_KEY
+```
+
 ### :information_desk_person: Concepts
 
 **CLI** - Secure configuration interface for on-line model upgrade/deployment on running Serving Services
@@ -76,24 +143,6 @@ Features:
 **Time-series DB** - Statistics collection service used by the Statistics Service, e.g. Prometheus
 
 **Dashboards** - Customizable dashboard-ing solution on top of the collected statistics, e.g. Grafana
-
-### prerequisites
-
-* ClearML-Server : Model repository, Service Health, Control plane
-* Kubernetes / Single-instance VM : Deploying containers 
-* CLI : Configuration & model deployment interface
-
-
-### :nail_care: Initial Setup
-
-1. Setup your [**ClearML Server**](https://github.com/allegroai/clearml-server) or use the [Free tier Hosting](https://app.community.clear.ml)
-2. Install the CLI on your  laptop `clearml` and `clearml-serving`
-   - `pip3 install https://github.com/allegroai/clearml-serving.git@dev`
-   - Make sure to configure your machine to connect to your `clearml-server` see [clearml-init](https://clear.ml/docs/latest/docs/getting_started/ds/ds_first_steps#install-clearml) for details
-3. Create the Serving Service Controller
-  - `clearml-serving create --name "serving example"`
-  - The new serving service UID should be printed `"New Serving Service created: id=aa11bb22aa11bb22`
-4. Write down the Serving Service UID
 
 ### :point_right: Toy model (scikit learn) deployment example 
 
@@ -123,61 +172,6 @@ Features:
 
 > To learn more on training models and the ClearML model repository, see the [ClearML documentation](https://clear.ml/docs)
 
-
-### :muscle: Nvidia Triton serving engine setup
-
-Nvidia Triton Serving Engine is used by clearml-serving to do the heavy lifting of deep-learning models on both GPU & CPU nodes. 
-Inside the Triton container a clearml controller is spinning and monitoring the Triton server.
-All the triton models are automatically downloaded into the triton container in real-time, configured, and served.
-A single Triton serving container is serving multiple models, based on the registered models on the Serving Service 
-Communication from the Inference container to the Triton container is done transparently over compressed gRPC channel.
-
-#### setup
-
-Optional: build the Triton container 
-  - Customize container [Dockerfile](clearml_serving/engines/triton/Dockerfile)
-  - Build container `docker build --tag clearml-serving-triton:latest -f clearml_serving/engines/triton/Dockerfile .`
-
-Spin the triton engine container: `docker run -v ~/clearml.conf:/root/clearml.conf -p 8001:8001 -e CLEARML_SERVING_TASK_ID=<service_id> -e CLEARML_TRITON_POLL_FREQ=5 -e CLEARML_TRITON_METRIC_FREQ=1 clearml-serving-triton:latest`
-
-Configure the "Serving Service" with the new Triton Engine gRPC IP:Port. Notice that when deploying on a Kubernetes cluster this should be a TCP ingest endpoint, to allow for transparent auto-scaling of the Triton Engine Containers
-
-`clearml-serving --id <service_id> config --triton-grpc-server <local_ip_here>:8001`
-
-Spin the inference service (this is the external RestAPI interface)
-`docker run -v ~/clearml.conf:/root/clearml.conf -p 8080:8080 -e CLEARML_SERVING_TASK_ID=<service_id> -e CLEARML_SERVING_POLL_FREQ=5 clearml-serving-inference:latest`
-
-Now eny model that will register with "Triton" engine, will run the pre/post processing code on the Inference service container, and the model inference itself will be executed on the Triton Engine container.
-See Tensorflow [example](examples/keras/readme.md) and Pytorch [example](examples/pytorch/readme.md) for further details.
-
-
-### :ocean: Container Configuration Variables 
-
-When spinning the Inference container or the Triton Engine container, 
-we need to specify the `clearml-server` address and access credentials
-One way of achieving that is by mounting the `clearml.conf` file into the container's HOME folder (i.e. `-v ~/clearml.conf:/root/clearml.conf`) 
-We can also pass environment variables instead (see [details](https://clear.ml/docs/latest/docs/configs/env_vars#server-connection):
-```bash
-CLEARML_API_HOST="https://api.clear.ml"
-CLEARML_WEB_HOST="https://app.clear.ml"
-CLEARML_FILES_HOST="https://files.clear.ml"
-CLEARML_API_ACCESS_KEY="access_key_here"
-CLEARML_API_SECRET_KEY="secret_key_here"
-```
-
-To access models stored on an S3 buckets, Google Storage or Azure blob storage (notice that with GS you also need to make sure the access json is available inside the containers). See further details on configuring the storage access [here](https://clear.ml/docs/latest/docs/integrations/storage#configuring-storage)
-
-```bash
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-AWS_DEFAULT_REGION
-
-GOOGLE_APPLICATION_CREDENTIALS
-
-AZURE_STORAGE_ACCOUNT
-AZURE_STORAGE_KEY
-```
-
 ### :turtle: Registering & Deploying new models manually 
 
 Uploading an existing model file into the model repository can be done via the `clearml` RestAPI, the python interface, or with the `clearml-serving` CLI 
@@ -200,7 +194,7 @@ Uploading an existing model file into the model repository can be done via the `
 
 The clearml Serving Service support automatic model deployment and upgrades, directly connected with the model repository and API. When the model auto-deploy is configured, a new model versions will be automatically deployed when you "publish" or "tag" a new model in the `clearml` model repository. This automation interface allows for simpler CI/CD model deployment process, as a single API automatically deploy (or remove) a model from the Serving Service.
 
-#### automatic model deployment example
+#### Automatic model deployment example
 
 1. Configure the model auto-update on the Serving Service
 - `clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "preprocess.py" --name "train sklearn model" --project "serving examples" --max-versions 2`
@@ -248,6 +242,42 @@ Example:
   - `curl -X POST "http://127.0.0.1:8080/serve/test_model" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'` 
 
 
+### Model monitoring and performance metrics
+
+ClearML serving instances send serving statistics (count/latency) automatically to Prometheus and Grafana can be used 
+to visualize and create live dashboards. 
+
+The default docker-compose installation is preconfigured with Prometheus and Grafana, do notice that by default data/ate of both containers is *not* persistent. To add persistence we do recommend adding a volume mount.
+
+You can also add many custom metrics on the input/predictions of your models.
+Once a model endpoint is registered, adding custom metric can be done using the CLI.
+For example, assume we have our mock scikit-learn model deployed on endpoint `test_model_sklearn`, 
+we can log the requests inputs and outputs (see examples/sklearn/preprocess.py example):
+```bash
+clearml-serving --id <serving_service_id_here> metrics add --endpoint test_model_sklearn --variable-scalar
+x0=0,0.1,0.5,1,10 x1=0,0.1,0.5,1,10 y=0,0.1,0.5,0.75,1
+```
+
+This will create a distribution histogram (buckets specified via a list of less-equal values after `=` sign),
+that we will be able to visualize on Grafana.
+Notice we can also log time-series values with `--variable-value x2` or discrete results (e.g. classifications strings) with `--variable-enum animal=cat,dog,sheep`.
+Additional custom variables can be in the preprocess and postprocess with a call to `collect_custom_statistics_fn({'new_var': 1.337})` see clearml_serving/preprocess/preprocess_template.py
+
+With the new metrics logged we can create a visualization dashboard over the latency of the calls, and the output distribution. 
+
+Grafana model performance example:
+
+- browse to http://localhost:3000
+- login with: admin/admin
+- create a new dashboard
+- select Prometheus as data source
+- Add a query: `100 * delta(test_model_sklearn:_latency_bucket[1m]) / delta(test_model_sklearn:_latency_sum[1m])`
+- Change type to heatmap, and select on the right hand-side under "Data Format" select "Time series buckets"
+- You now have the latency distribution, over time.
+- Repeat the same process for x0, the query would be `100 * delta(test_model_sklearn:x0_bucket[1m]) / delta(test_model_sklearn:x0_sum[1m])`
+
+> **Notice**: If not specified all serving requests will be logged, to change the default configure "CLEARML_DEFAULT_METRIC_LOG_FREQ", for example CLEARML_DEFAULT_METRIC_LOG_FREQ=0.2 means only 20% of all requests will be logged. You can also specify per endpoint log frequency with the `clearml-serving` CLI. Check the CLI documentation with `cleamrl-serving metrics --help`
+
 ### :fire: Model Serving Examples
 
 - Scikit-Learn [example](examples/sklearn/readme.md) - random data 
@@ -274,8 +304,9 @@ Example:
   - [x] CLI configuration tool
   - [x] Nvidia Triton integration
   - [x] GZip request compression
-  - [ ] TorchServe engine integration
-  - [ ] Prebuilt Docker containers (dockerhub)
+  - [x] TorchServe engine integration
+  - [x] Prebuilt Docker containers (dockerhub)
+  - [x] Docker-compose deployment (CPU/GPU)
   - [x] Scikit-Learn example
   - [x] XGBoost example
   - [x] LightGBM example
@@ -283,10 +314,10 @@ Example:
   - [x] TensorFlow/Keras example
   - [x] Model ensemble example
   - [x] Model pipeline example
-  - [ ] Statistics Service
-  - [ ] Kafka install instructions
-  - [ ] Prometheus install instructions
-  - [ ] Grafana install instructions
+  - [x] Statistics Service
+  - [x] Kafka install instructions
+  - [x] Prometheus install instructions
+  - [x] Grafana install instructions
   - [ ] Kubernetes Helm Chart
 
 ## Contributing

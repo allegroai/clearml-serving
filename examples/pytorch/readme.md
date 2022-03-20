@@ -13,6 +13,9 @@ The output will be a model created on the project "serving examples", by the nam
 
 ## setting up the serving service
 
+
+Prerequisites, PyTorch models require Triton engine support, please use `docker-compose-triton.yml` / `docker-compose-triton-gpu.yml` or if running on Kubernetes, the matching helm chart.
+
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint:
 
@@ -39,4 +42,4 @@ Or add Canary endpoint
 
 > **_Notice:_**  You can also change the serving service while it is already running!
 This includes adding/removing endpoints, adding canary model routing etc.
-
+by default new endpoints/models will be automatically updated after 1 minute

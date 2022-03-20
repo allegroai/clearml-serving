@@ -1,7 +1,9 @@
 import json
 import os
 from pathlib import Path
-from time import sleep
+from queue import Queue
+from random import random
+from time import sleep, time
 from typing import Optional, Union, Dict, List
 import itertools
 import threading
@@ -11,7 +13,7 @@ from numpy.random import choice
 from clearml import Task, Model
 from clearml.storage.util import hash_dict
 from .preprocess_service import BasePreprocessRequest
-from .endpoints import ModelEndpoint, ModelMonitoring, CanaryEP
+from .endpoints import ModelEndpoint, ModelMonitoring, CanaryEP, EndpointMetricLogging
 
 
 class FastWriteCounter(object):
@@ -30,7 +32,12 @@ class FastWriteCounter(object):
 
 
 class ModelRequestProcessor(object):
-    _system_tag = 'serving-control-plane'
+    _system_tag = "serving-control-plane"
+    _kafka_topic = "clearml_inference_stats"
+    _config_key_serving_base_url = "serving_base_url"
+    _config_key_triton_grpc = "triton_grpc_server"
+    _config_key_kafka_stats = "kafka_service_server"
+    _config_key_def_metric_freq = "metric_logging_freq"
 
     def __init__(
             self,
@@ -60,15 +67,24 @@ class ModelRequestProcessor(object):
         self._canary_endpoints = dict()  # type: Dict[str, CanaryEP]
         self._canary_route = dict()  # type: Dict[str, dict]
         self._engine_processor_lookup = dict()  # type: Dict[str, BasePreprocessRequest]
+        self._metric_logging = dict()  # type: Dict[str, EndpointMetricLogging]
+        self._endpoint_metric_logging = dict()  # type: Dict[str, EndpointMetricLogging]
         self._last_update_hash = None
         self._sync_daemon_thread = None
+        self._stats_sending_thread = None
+        self._stats_queue = Queue()
         # this is used for Fast locking mechanisms (so we do not actually need to use Locks)
         self._update_lock_flag = False
         self._request_processing_state = FastWriteCounter()
         self._update_lock_guard = update_lock_guard or threading.Lock()
+        self._instance_task = None
         # serving server config
         self._configuration = {}
-        self._instance_task = None
+        # deserialized values go here
+        self._kafka_stats_url = None
+        self._triton_grpc = None
+        self._serving_base_url = None
+        self._metric_log_freq = None
 
     def process_request(self, base_url: str, version: str, request_body: dict) -> dict:
         """
@@ -100,9 +116,7 @@ class ModelRequestProcessor(object):
             processor = self._engine_processor_lookup.get(url)
             if not processor:
                 processor_cls = BasePreprocessRequest.get_engine_cls(ep.engine_type)
-                processor = processor_cls(
-                    model_endpoint=ep, task=self._task, server_config=dict(**self._configuration)
-                )
+                processor = processor_cls(model_endpoint=ep, task=self._task)
                 self._engine_processor_lookup[url] = processor
 
             return_value = self._process_request(processor=processor, url=url, body=request_body)
@@ -124,6 +138,8 @@ class ModelRequestProcessor(object):
             self,
             external_serving_base_url: Optional[str] = None,
             external_triton_grpc_server: Optional[str] = None,
+            external_kafka_service_server: Optional[str] = None,
+            default_metric_log_freq: Optional[float] = None,
     ):
         """
         Set ModelRequestProcessor configuration arguments.
@@ -133,21 +149,40 @@ class ModelRequestProcessor(object):
             allowing it to concatenate and combine multiple model requests into one
         :param external_triton_grpc_server: set the external grpc tcp port of the Nvidia Triton clearml container.
             Used by the clearml triton engine class to send inference requests
+        :param external_kafka_service_server: Optional, Kafka endpoint for the statistics controller collection.
+        :param default_metric_log_freq: Default request metric logging (0 to 1.0, 1. means 100% of requests are logged)
         """
         if external_serving_base_url is not None:
             self._task.set_parameter(
-                name="General/serving_base_url",
+                name="General/{}".format(self._config_key_serving_base_url),
                 value=str(external_serving_base_url),
                 value_type="str",
                 description="external base http endpoint for the serving service"
             )
         if external_triton_grpc_server is not None:
             self._task.set_parameter(
-                name="General/triton_grpc_server",
+                name="General/{}".format(self._config_key_triton_grpc),
                 value=str(external_triton_grpc_server),
                 value_type="str",
                 description="external grpc tcp port of the Nvidia Triton ClearML container running"
             )
+        if external_kafka_service_server is not None:
+            self._task.set_parameter(
+                name="General/{}".format(self._config_key_kafka_stats),
+                value=str(external_kafka_service_server),
+                value_type="str",
+                description="external Kafka service url for the statistics controller server"
+            )
+        if default_metric_log_freq is not None:
+            self._task.set_parameter(
+                name="General/{}".format(self._config_key_def_metric_freq),
+                value=str(default_metric_log_freq),
+                value_type="float",
+                description="Request metric logging frequency"
+            )
+
+    def get_configuration(self) -> dict:
+        return dict(**self._configuration)
 
     def add_endpoint(
             self,
@@ -301,13 +336,92 @@ class ModelRequestProcessor(object):
         self._canary_endpoints.pop(endpoint_url, None)
         return True
 
-    def deserialize(self, task: Task = None, prefetch_artifacts=False, skip_sync=False) -> bool:
+    def add_metric_logging(self, metric: Union[EndpointMetricLogging, dict]) -> bool:
+        """
+        Add metric logging to a specific endpoint
+        Valid metric variable are any variables on the request or response dictionary,
+        or a custom preprocess reported variable
+
+        When overwriting and existing monitored variable, output a warning.
+
+        :param metric: Metric variable to monitor
+        :return: True if successful
+        """
+        if not isinstance(metric, EndpointMetricLogging):
+            metric = EndpointMetricLogging(**metric)
+
+        name = str(metric.endpoint).strip("/")
+        metric.endpoint = name
+
+        if name not in self._endpoints and not name.endswith('*'):
+            raise ValueError("Metric logging \'{}\' references a nonexistent endpoint".format(name))
+
+        if name in self._metric_logging:
+            print("Warning: Metric logging \'{}\' overwritten".format(name))
+
+        self._metric_logging[name] = metric
+        return True
+
+    def remove_metric_logging(
+            self,
+            endpoint: str,
+            variable_name: str = None,
+    ) -> bool:
+        """
+        Remove existing logged metric variable. Use variable name and endpoint as unique identifier
+
+        :param endpoint: Endpoint name (including version, e.g. "model/1" or "model/*")
+        :param variable_name: Variable name (str), pass None to remove the entire endpoint logging
+
+        :return: True if successful
+        """
+
+        name = str(endpoint).strip("/")
+
+        if name not in self._metric_logging or \
+                (variable_name and variable_name not in self._metric_logging[name].metrics):
+            return False
+
+        if not variable_name:
+            self._metric_logging.pop(name, None)
+        else:
+            self._metric_logging[name].metrics.pop(variable_name, None)
+
+        return True
+
+    def list_metric_logging(self) -> Dict[str, EndpointMetricLogging]:
+        """
+        List existing logged metric variables.
+
+        :return: Dictionary, key='endpoint/version' value=EndpointMetricLogging
+        """
+
+        return dict(**self._metric_logging)
+
+    def list_endpoint_logging(self) -> Dict[str, EndpointMetricLogging]:
+        """
+        List endpoints (fully synced) current  metric logging state.
+
+        :return: Dictionary, key='endpoint/version' value=EndpointMetricLogging
+        """
+
+        return dict(**self._endpoint_metric_logging)
+
+    def deserialize(
+            self,
+            task: Task = None,
+            prefetch_artifacts: bool = False,
+            skip_sync: bool = False,
+            update_current_task: bool = True
+    ) -> bool:
         """
         Restore ModelRequestProcessor state from Task
         return True if actually needed serialization, False nothing changed
         :param task: Load data from Task
         :param prefetch_artifacts: If True prefetch artifacts requested by the endpoints
         :param skip_sync: If True do not update the canary/monitoring state
+        :param update_current_task: is not skip_sync, and is True,
+            update the current Task with the configuration synced from the serving service Task
         """
         if not task:
             task = self._task
@@ -315,7 +429,15 @@ class ModelRequestProcessor(object):
         endpoints = task.get_configuration_object_as_dict(name='endpoints') or {}
         canary_ep = task.get_configuration_object_as_dict(name='canary') or {}
         model_monitoring = task.get_configuration_object_as_dict(name='model_monitoring') or {}
-        hashed_conf = hash_dict(dict(endpoints=endpoints, canary_ep=canary_ep, model_monitoring=model_monitoring))
+        metric_logging = task.get_configuration_object_as_dict(name='metric_logging') or {}
+
+        hashed_conf = hash_dict(
+            dict(endpoints=endpoints,
+                 canary_ep=canary_ep,
+                 model_monitoring=model_monitoring,
+                 metric_logging=metric_logging,
+                 configuration=configuration)
+        )
         if self._last_update_hash == hashed_conf and not self._model_monitoring_update_request:
             return False
         print("Info: syncing model endpoint configuration, state hash={}".format(hashed_conf))
@@ -333,13 +455,18 @@ class ModelRequestProcessor(object):
             k: CanaryEP(**{i: j for i, j in v.items() if hasattr(CanaryEP.__attrs_attrs__, i)})
             for k, v in canary_ep.items()
         }
+        metric_logging = {
+            k: EndpointMetricLogging(**{i: j for i, j in v.items() if hasattr(EndpointMetricLogging.__attrs_attrs__, i)})
+            for k, v in metric_logging.items()
+        }
 
         # if there is no need to sync Canary and Models we can just leave
         if skip_sync:
             self._endpoints = endpoints
             self._model_monitoring = model_monitoring
             self._canary_endpoints = canary_endpoints
-            self._configuration = configuration
+            self._metric_logging = metric_logging
+            self._deserialize_conf_dict(configuration)
             return True
 
         # make sure we only have one stall request at any given moment
@@ -366,18 +493,21 @@ class ModelRequestProcessor(object):
             self._endpoints = endpoints
             self._model_monitoring = model_monitoring
             self._canary_endpoints = canary_endpoints
-            self._configuration = configuration
+            self._metric_logging = metric_logging
+            self._deserialize_conf_dict(configuration)
 
             # if we have models we need to sync, now is the time
             self._sync_monitored_models()
 
             self._update_canary_lookup()
 
+            self._sync_metric_logging()
+
             # release stall lock
             self._update_lock_flag = False
 
             # update the state on the inference task
-            if Task.current_task() and Task.current_task().id != self._task.id:
+            if update_current_task and Task.current_task() and Task.current_task().id != self._task.id:
                 self.serialize(task=Task.current_task())
 
         return True
@@ -394,6 +524,8 @@ class ModelRequestProcessor(object):
         task.set_configuration_object(name='canary', config_dict=config_dict)
         config_dict = {k: v.as_dict(remove_null_entries=True) for k, v in self._model_monitoring.items()}
         task.set_configuration_object(name='model_monitoring', config_dict=config_dict)
+        config_dict = {k: v.as_dict(remove_null_entries=True) for k, v in self._metric_logging.items()}
+        task.set_configuration_object(name='metric_logging', config_dict=config_dict)
 
     def _update_canary_lookup(self):
         canary_route = {}
@@ -547,6 +679,32 @@ class ModelRequestProcessor(object):
         )
         return True
 
+    def _sync_metric_logging(self, force: bool = False) -> bool:
+        if not force and not self._metric_logging:
+            return False
+
+        fixed_metric_endpoint = {
+            k: v for k, v in self._metric_logging.items() if "*/" not in k
+        }
+        prefix_metric_endpoint = {k.split("*/")[0]: v for k, v in self._metric_logging.items() if "*/" in k}
+
+        endpoint_metric_logging = {}
+        for k, ep in list(self._endpoints.items()) + list(self._model_monitoring_endpoints.items()):
+            if k in fixed_metric_endpoint:
+                if k not in endpoint_metric_logging:
+                    endpoint_metric_logging[k] = fixed_metric_endpoint[k]
+
+                continue
+            for p, v in prefix_metric_endpoint.items():
+                if k.startswith(p):
+                    if k not in endpoint_metric_logging:
+                        endpoint_metric_logging[k] = v
+
+                    break
+
+        self._endpoint_metric_logging = endpoint_metric_logging
+        return True
+
     def launch(self, poll_frequency_sec=300):
         """
         Launch the background synchronization thread and monitoring thread
@@ -572,10 +730,15 @@ class ModelRequestProcessor(object):
                 return
             self._sync_daemon_thread = threading.Thread(
                 target=self._sync_daemon, args=(poll_frequency_sec, ), daemon=True)
+            self._stats_sending_thread = threading.Thread(
+                target=self._stats_send_loop, daemon=True)
+
             self._sync_daemon_thread.start()
+            self._stats_sending_thread.start()
+
         # we return immediately
 
-    def _sync_daemon(self, poll_frequency_sec=300):
+    def _sync_daemon(self, poll_frequency_sec: float = 300) -> None:
         """
         Background thread, syncing model changes into request service.
         """
@@ -616,6 +779,44 @@ class ModelRequestProcessor(object):
                             self._engine_processor_lookup.pop(k, None)
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
+
+    def _stats_send_loop(self) -> None:
+        """
+        Background thread for sending stats to Kafka service
+        """
+        if not self._kafka_stats_url:
+            print("No Kafka Statistics service configured, shutting down statistics report")
+            return
+
+        print("Starting Kafka Statistics reporting: {}".format(self._kafka_stats_url))
+
+        from kafka import KafkaProducer  # noqa
+
+        while True:
+            try:
+                producer = KafkaProducer(
+                    bootstrap_servers=self._kafka_stats_url,  # ['localhost:9092'],
+                    value_serializer=lambda x: json.dumps(x).encode('utf-8'),
+                    compression_type='lz4',  # requires python lz4 package
+                )
+                break
+            except Exception as ex:
+                print("Error: failed opening Kafka consumer [{}]: {}".format(self._kafka_stats_url, ex))
+                print("Retrying in 30 seconds")
+                sleep(30)
+
+        while True:
+            try:
+                stats_dict = self._stats_queue.get(block=True)
+            except Exception as ex:
+                print("Warning: Statistics thread exception: {}".format(ex))
+                break
+            # send into kafka service
+            try:
+                producer.send(self._kafka_topic, value=stats_dict).get()
+            except Exception as ex:
+                print("Warning: Failed to send statistics packet to Kafka service: {}".format(ex))
+                pass
 
     def get_id(self) -> str:
         return self._task.id
@@ -781,12 +982,76 @@ class ModelRequestProcessor(object):
         self._instance_task.get_logger().report_plotly(
             title='Serving Endpoints Layout', series='', iteration=0, figure=fig)
 
-    @staticmethod
-    def _process_request(processor: BasePreprocessRequest, url: str, body: dict) -> dict:
-        # todo: add some statistics
-        preprocessed = processor.preprocess(body)
-        processed = processor.process(data=preprocessed)
-        return processor.postprocess(data=processed)
+    def _deserialize_conf_dict(self, configuration: dict) -> None:
+        self._configuration = configuration
+
+        # deserialized values go here
+        self._kafka_stats_url = \
+            configuration.get(self._config_key_kafka_stats) or \
+            os.environ.get("CLEARML_DEFAULT_KAFKA_SERVE_URL")
+        self._triton_grpc = \
+            configuration.get(self._config_key_triton_grpc) or \
+            os.environ.get("CLEARML_DEFAULT_TRITON_GRPC_ADDR")
+        self._serving_base_url = \
+            configuration.get(self._config_key_serving_base_url) or \
+            os.environ.get("CLEARML_DEFAULT_BASE_SERVE_URL")
+        self._metric_log_freq = \
+            float(configuration.get(self._config_key_def_metric_freq,
+                                    os.environ.get("CLEARML_DEFAULT_METRIC_LOG_FREQ", 1.0)))
+        # update back configuration
+        self._configuration[self._config_key_kafka_stats] = self._kafka_stats_url
+        self._configuration[self._config_key_triton_grpc] = self._triton_grpc
+        self._configuration[self._config_key_serving_base_url] = self._serving_base_url
+        self._configuration[self._config_key_def_metric_freq] = self._metric_log_freq
+        # update preprocessing classes
+        BasePreprocessRequest.set_server_config(self._configuration)
+
+    def _process_request(self, processor: BasePreprocessRequest, url: str, body: dict) -> dict:
+        # collect statistics for this request
+        stats = {}
+        stats_collect_fn = None
+        collect_stats = False
+        freq = 1
+        # decide if we are collecting the stats
+        metric_endpoint = self._metric_logging.get(url)
+        if self._kafka_stats_url:
+            freq = metric_endpoint.log_frequency if metric_endpoint and metric_endpoint.log_frequency is not None \
+                else self._metric_log_freq
+
+            if freq and random() <= freq:
+                stats_collect_fn = stats.update
+                collect_stats = True
+
+        tic = time()
+        preprocessed = processor.preprocess(body, stats_collect_fn)
+        processed = processor.process(preprocessed, stats_collect_fn)
+        return_value = processor.postprocess(processed, stats_collect_fn)
+        tic = time() - tic
+        if collect_stats:
+            # 10th of a millisecond should be enough
+            stats['_latency'] = round(tic, 4)
+            stats['_count'] = int(1.0/freq)
+            stats['_url'] = url
+
+            # collect inputs
+            if metric_endpoint and body:
+                for k, v in body.items():
+                    if k in metric_endpoint.metrics:
+                        stats[k] = v
+            # collect outputs
+            if metric_endpoint and return_value:
+                for k, v in return_value.items():
+                    if k in metric_endpoint.metrics:
+                        stats[k] = v
+
+            # send stats in background, push it into a thread queue
+            # noinspection PyBroadException
+            try:
+                self._stats_queue.put(stats, block=False)
+            except Exception:
+                pass
+
+        return return_value
 
     @classmethod
     def list_control_plane_tasks(
@@ -894,4 +1159,3 @@ class ModelRequestProcessor(object):
             if not endpoint.auxiliary_cfg and missing:
                 raise ValueError("Triton engine requires input description - missing values in {}".format(missing))
         return True
-

@@ -10,7 +10,7 @@ import numpy as np
 from clearml import Task, Logger, InputModel
 from clearml.backend_api.utils import get_http_session_with_retry
 from clearml.utilities.pyhocon import ConfigFactory, ConfigTree, HOCONConverter
-from pathlib2 import Path
+from pathlib import Path
 
 from clearml_serving.serving.endpoints import ModelEndpoint
 from clearml_serving.serving.model_request_processor import ModelRequestProcessor
@@ -413,10 +413,10 @@ def main():
         '--serving-id', default=os.environ.get('CLEARML_SERVING_TASK_ID'), type=str,
         help='Specify main serving service Task ID')
     parser.add_argument(
-        '--project', default='serving', type=str,
+        '--project', default=None, type=str,
         help='Optional specify project for the serving engine Task')
     parser.add_argument(
-        '--name', default='nvidia-triton', type=str,
+        '--name', default='triton engine', type=str,
         help='Optional specify task name for the serving engine Task')
     parser.add_argument(
         '--update-frequency', default=os.environ.get('CLEARML_TRITON_POLL_FREQ') or 10., type=float,
@@ -481,8 +481,13 @@ def main():
             t = type(getattr(args, args_var, None))
             setattr(args, args_var, type(t)(v) if t is not None else v)
 
+    # noinspection PyProtectedMember
+    serving_task = ModelRequestProcessor._get_control_plane_task(task_id=args.inference_task_id)
+
     task = Task.init(
-        project_name=args.project, task_name=args.name, task_type=Task.TaskTypes.inference,
+        project_name=args.project or serving_task.get_project_name() or "serving",
+        task_name="{} - {}".format(serving_task.name, args.name),
+        task_type=Task.TaskTypes.inference,
         continue_last_task=args.inference_task_id or None
     )
     print("configuration args: {}".format(args))
