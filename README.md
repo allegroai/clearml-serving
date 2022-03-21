@@ -8,9 +8,6 @@
 ## **`clearml-serving v2.0` </br> :sparkles: Model Serving (ML/DL) Made Easy :tada:**
 
 
-## :dizzy: New! version 2.0 in beta [now!](https://github.com/allegroai/clearml-serving/tree/dev) :confetti_ball:
-
-
 [![GitHub license](https://img.shields.io/github/license/allegroai/clearml-serving.svg)](https://img.shields.io/github/license/allegroai/clearml-serving.svg)
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/clearml-serving.svg)](https://img.shields.io/pypi/pyversions/clearml-serving.svg)
 [![PyPI version shields.io](https://img.shields.io/pypi/v/clearml-serving.svg)](https://img.shields.io/pypi/v/clearml-serving.svg)
