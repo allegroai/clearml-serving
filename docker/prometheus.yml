@@ -1,0 +1,22 @@
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+  evaluation_interval:     15s # By default, scrape targets every 15 seconds.
+  external_labels:
+    monitor: 'clearml-serving'
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'clearml-inference-stats'
+
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['clearml-serving-statistics:9999']
