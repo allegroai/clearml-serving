@@ -30,11 +30,9 @@ Or add Canary endpoint
 
 `clearml-serving --id <service_id> model canary --endpoint "test_model_auto" --weights 0.1 0.9 --input-endpoint-prefix test_model_auto`
    
-3. Run the Triton Engine `docker run -v ~/clearml.conf:/root/clearml.conf -p 8001:8001 -e CLEARML_SERVING_TASK_ID=<service_id> clearml-serving-triton:latest`
-4. Configure the Triton Engine IP on the Serving Service (if running on k8s, the gRPC ingest of the triton container)
-`clearml-serving --id <service_id> config --triton-grpc-server <local_ip_here>:8001`
-5. Run the clearml-serving container `docker run -v ~/clearml.conf:/root/clearml.conf -p 8001:8001 -e CLEARML_SERVING_TASK_ID=<service_id> clearml-serving:latest`
-6. Test new endpoint: `curl -X POST "http://127.0.0.1:8080/serve/test_model_keras" -H "accept: application/json" -H "Content-Type: application/json" -d '{"url": "https://camo.githubusercontent.com/8385ca52c9cba1f6e629eb938ab725ec8c9449f12db81f9a34e18208cd328ce9/687474703a2f2f706574722d6d6172656b2e636f6d2f77702d636f6e74656e742f75706c6f6164732f323031372f30372f6465636f6d707265737365642e6a7067"}'`
+3. Make sure you have the `clearml-serving` `docker-compose-triton.yml` (or `docker-compose-triton-gpu.yml`) running, it might take it a minute or two to sync with the new endpoint.
+
+4. Test new endpoint (do notice the first call will trigger the model pulling, so it might take longer, from here on, it's all in memory): `curl -X POST "http://127.0.0.1:8080/serve/test_model_keras" -H "accept: application/json" -H "Content-Type: application/json" -d '{"url": "https://camo.githubusercontent.com/8385ca52c9cba1f6e629eb938ab725ec8c9449f12db81f9a34e18208cd328ce9/687474703a2f2f706574722d6d6172656b2e636f6d2f77702d636f6e74656e742f75706c6f6164732f323031372f30372f6465636f6d707265737365642e6a7067"}'`
 
 > **_Notice:_**  You can also change the serving service while it is already running!
 This includes adding/removing endpoints, adding canary model routing etc.
