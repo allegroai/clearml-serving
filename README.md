@@ -244,6 +244,8 @@ Example:
 
 ### Model monitoring and performance metrics
 
+![Grafana Screenshot](docs/grafana_screenshot.png)
+
 ClearML serving instances send serving statistics (count/latency) automatically to Prometheus and Grafana can be used 
 to visualize and create live dashboards. 
 
@@ -271,10 +273,10 @@ Grafana model performance example:
 - login with: admin/admin
 - create a new dashboard
 - select Prometheus as data source
-- Add a query: `100 * delta(test_model_sklearn:_latency_bucket[1m]) / delta(test_model_sklearn:_latency_sum[1m])`
+- Add a query: `100 * increase(test_model_sklearn:_latency_bucket[1m]) / increase(test_model_sklearn:_latency_sum[1m])`
 - Change type to heatmap, and select on the right hand-side under "Data Format" select "Time series buckets"
 - You now have the latency distribution, over time.
-- Repeat the same process for x0, the query would be `100 * delta(test_model_sklearn:x0_bucket[1m]) / delta(test_model_sklearn:x0_sum[1m])`
+- Repeat the same process for x0, the query would be `100 * increase(test_model_sklearn:x0_bucket[1m]) / increase(test_model_sklearn:x0_sum[1m])`
 
 > **Notice**: If not specified all serving requests will be logged, to change the default configure "CLEARML_DEFAULT_METRIC_LOG_FREQ", for example CLEARML_DEFAULT_METRIC_LOG_FREQ=0.2 means only 20% of all requests will be logged. You can also specify per endpoint log frequency with the `clearml-serving` CLI. Check the CLI documentation with `cleamrl-serving metrics --help`
 
