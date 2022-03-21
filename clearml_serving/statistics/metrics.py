@@ -37,14 +37,17 @@ class ScalarHistogram(Histogram):
         for details.
         """
         self._raise_if_not_observable()
-        self._sum.inc(1)
-        for i, bound in enumerate(self._upper_bounds):
-            if amount <= bound:
-                self._buckets[i].inc(1)
-                if exemplar:
-                    _validate_exemplar(exemplar)
-                    self._buckets[i].set_exemplar(Exemplar(exemplar, amount, time()))
-                break
+        if not isinstance(amount, (list, tuple)):
+            amount = [amount]
+        self._sum.inc(len(amount))
+        for v in amount:
+            for i, bound in enumerate(self._upper_bounds):
+                if v <= bound:
+                    self._buckets[i].inc(1)
+                    if exemplar:
+                        _validate_exemplar(exemplar)
+                        self._buckets[i].set_exemplar(Exemplar(exemplar, v, time()))
+                    break
 
     def _child_samples(self) -> Iterable[Sample]:
         samples = []
