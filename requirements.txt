@@ -1,1 +1,1 @@
-clearml >= 1.1.6
+clearml >= 1.3.1
