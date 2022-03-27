@@ -37,7 +37,7 @@ Features:
   * Multi cluster support
   * Out-of-the-box node auto-scaling based on load/usage
 * Efficient
-  * multi-container resource utilization
+  * Multi-container resource utilization
   * Support for CPU & GPU nodes
   * Auto-batching for DL models
 * Automatic deployment
@@ -61,7 +61,7 @@ Features:
 
 ## Installation
 
-### prerequisites
+### Prerequisites
 
 * ClearML-Server : Model repository, Service Health, Control plane
 * Kubernetes / Single-instance Machine : Deploying containers 
@@ -70,14 +70,14 @@ Features:
 ### :nail_care: Initial Setup
 
 1. Setup your [**ClearML Server**](https://github.com/allegroai/clearml-server) or use the [Free tier Hosting](https://app.clear.ml)
-2. Setup local access (if you haven't already), see introductions [here](https://clear.ml/docs/latest/docs/getting_started/ds/ds_first_steps#install-clearml)
+2. Setup local access (if you haven't already), see instructions [here](https://clear.ml/docs/latest/docs/getting_started/ds/ds_first_steps#install-clearml)
 3. Install clearml-serving CLI: 
 ```bash
-pip3 istall clearml-serving
+pip3 install clearml-serving
 ```
 4. Create the Serving Service Controller
   - `clearml-serving create --name "serving example"`
-  - The new serving service UID should be printed `"New Serving Service created: id=aa11bb22aa11bb22`
+  - The new serving service UID should be printed `New Serving Service created: id=aa11bb22aa11bb22`
 5. Write down the Serving Service UID
 6. Clone clearml-serving repository
 ```bash
@@ -114,7 +114,7 @@ cd docker && docker-compose --env-file example.env -f docker-compose-triton-gpu.
 ### :ocean: Optional: advanced setup - S3/GS/Azure access
 
 To add access credentials and allow the inference containers to download models from your S3/GS/Azure object-storage,
-add the respected environment variables to your env files (`example.env`)
+add the respective environment variables to your env files (`example.env`)
 See further details on configuring the storage access [here](https://clear.ml/docs/latest/docs/integrations/storage#configuring-storage)
 
 ```bash
@@ -166,7 +166,7 @@ AZURE_STORAGE_KEY
 **Notice** On the first few requests the inference container needs to download the model file and preprocessing python code, this means the request might take a little longer, once everything is cached, it will return almost immediately.
 
 **Notes:**
-> To review the model repository in the ClearML web UI, under the "serving examples" Project on your ClearML account/server ([free hosted](https://app.clear.ml) or [self-deployed](https://github.com/allegroai/clearml-server)).
+> Review the model repository in the ClearML web UI, under the "serving examples" Project on your ClearML account/server ([free hosted](https://app.clear.ml) or [self-deployed](https://github.com/allegroai/clearml-server)).
 
 > Inference services status, console outputs and machine metrics are available in the ClearML UI in the Serving Service project (default: "DevOps" project)
 
@@ -174,7 +174,7 @@ AZURE_STORAGE_KEY
 
 ### :turtle: Registering & Deploying new models manually 
 
-Uploading an existing model file into the model repository can be done via the `clearml` RestAPI, the python interface, or with the `clearml-serving` CLI 
+Uploading an existing model file into the model repository can be done via the `clearml` RestAPI, the python interface, or with the `clearml-serving` CLI. 
 
 > To learn more on training models and the ClearML model repository, see the [ClearML documentation](https://clear.ml/docs)
 
@@ -218,19 +218,18 @@ Canary endpoint deployment add a new endpoint where the actual request is sent t
 clearml-serving --id <service_id> model canary --endpoint "test_model_sklearn_canary" --weights 0.1 0.9 --input-endpoints test_model_sklearn/2 test_model_sklearn/1
 ```
 This means that any request coming to `/test_model_sklearn_canary/` will be routed with probability of 90% to
-`/test_model_sklearn/1/` and with probability of 10% to `/test_model_sklearn/2/` 
+`/test_model_sklearn/1/` and with probability of 10% to `/test_model_sklearn/2/`. 
 
 **Note:**
 > As with any other Serving Service configuration, we can configure the Canary endpoint while the Inference containers are already running and deployed, they will get updated in their next update cycle (default: once every 5 minutes)
 
-We Can also prepare a "fixed" canary endpoint, always splitting the load between the last two deployed models:
+We can also prepare a "fixed" canary endpoint, always splitting the load between the last two deployed models:
 ```bash
 clearml-serving --id <service_id> model canary --endpoint "test_model_sklearn_canary" --weights 0.1 0.9 --input-endpoints-prefix test_model_sklearn/
 ```
 
-This means that is we have two model inference endpoints: `/test_model_sklearn/1/`, `/test_model_sklearn/2/`  
-the 10% probability (weight 0.1) will match the last (order by version number) endpoint, i.e. `/test_model_sklearn/2/` and the 90% will match `/test_model_sklearn/2/`
-When we add a new model endpoint version, e.g. `/test_model_sklearn/3/`, the canary distribution will automatically match the 90% probability to `/test_model_sklearn/2/` and the 10% to the new endpoint `/test_model_sklearn/3/`  
+This means that is we have two model inference endpoints: `/test_model_sklearn/1/` and `/test_model_sklearn/2/`. The 10% probability (weight 0.1) will match the last (order by version number) endpoint, i.e. `/test_model_sklearn/2/` and the 90% will match `/test_model_sklearn/2/`.
+When we add a new model endpoint version, e.g. `/test_model_sklearn/3/`, the canary distribution will automatically match the 90% probability to `/test_model_sklearn/2/` and the 10% to the new endpoint `/test_model_sklearn/3/`.  
 
 Example:
 1. Add two endpoints:
@@ -278,7 +277,7 @@ Grafana model performance example:
 - You now have the latency distribution, over time.
 - Repeat the same process for x0, the query would be `100 * increase(test_model_sklearn:x0_bucket[1m]) / increase(test_model_sklearn:x0_sum[1m])`
 
-> **Notice**: If not specified all serving requests will be logged, to change the default configure "CLEARML_DEFAULT_METRIC_LOG_FREQ", for example CLEARML_DEFAULT_METRIC_LOG_FREQ=0.2 means only 20% of all requests will be logged. You can also specify per endpoint log frequency with the `clearml-serving` CLI. Check the CLI documentation with `cleamrl-serving metrics --help`
+> **Notice**: If not specified all serving requests will be logged, to change the default configure "CLEARML_DEFAULT_METRIC_LOG_FREQ", for example CLEARML_DEFAULT_METRIC_LOG_FREQ=0.2 means only 20% of all requests will be logged. You can also specify per endpoint log frequency with the `clearml-serving` CLI. Check the CLI documentation with `clearml-serving metrics --help`
 
 ### :fire: Model Serving Examples
 
