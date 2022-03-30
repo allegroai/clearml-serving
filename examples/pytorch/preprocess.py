@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image, ImageOps
 
 
-# Notice Preprocess class Must be named "Preprocess"
 from clearml import StorageManager
 
 
+# Notice Preprocess class Must be named "Preprocess"
 class Preprocess(object):
     def __init__(self):
         # set internal state, this will be called only once. (i.e. not per request)
