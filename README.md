@@ -21,6 +21,8 @@
 **`clearml-serving`** is a command line utility for model deployment and orchestration.  
 It enables model deployment including serving and preprocessing code to a Kubernetes cluster or custom container based solution.
 
+### :fire: NEW :confetti_ball: Take it for a spin with a simple `docker-compose` [command](#nail_care-initial-setup) :magic_wand: :sparkles: 
+
 
 <a href="https://excalidraw.com/#json=jiPWui2cpyOmQh1hTDYue,538MVKS-YCrTGw_1LzKqog"><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/design_diagram.png?raw=true" width="100%"></a>
 
@@ -195,7 +197,7 @@ Uploading an existing model file into the model repository can be done via the `
 
 The clearml Serving Service support automatic model deployment and upgrades, directly connected with the model repository and API. When the model auto-deploy is configured, a new model versions will be automatically deployed when you "publish" or "tag" a new model in the `clearml` model repository. This automation interface allows for simpler CI/CD model deployment process, as a single API automatically deploy (or remove) a model from the Serving Service.
 
-#### Automatic model deployment example
+#### :bulb: Automatic model deployment example
 
 1. Configure the model auto-update on the Serving Service
 - `clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "preprocess.py" --name "train sklearn model" --project "serving examples" --max-versions 2`
@@ -242,7 +244,7 @@ Example:
   - `curl -X POST "http://127.0.0.1:8080/serve/test_model" -H "accept: application/json" -H "Content-Type: application/json" -d '{"x0": 1, "x1": 2}'` 
 
 
-### Model monitoring and performance metrics
+### :bar_chart: Model monitoring and performance metrics :bell:
 
 ![Grafana Screenshot](docs/grafana_screenshot.png)
 
