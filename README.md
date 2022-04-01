@@ -21,6 +21,9 @@
 **`clearml-serving`** is a command line utility for model deployment and orchestration.  
 It enables model deployment including serving and preprocessing code to a Kubernetes cluster or custom container based solution.
 
+
+<a href="https://excalidraw.com/#json=jiPWui2cpyOmQh1hTDYue,538MVKS-YCrTGw_1LzKqog"><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/design_diagram.png?raw=true" width="100%"></a>
+
 Features:
 * Easy to deploy & configure
   * Support Machine Learning Models (Scikit Learn, XGBoost, LightGBM)
@@ -56,8 +59,6 @@ Features:
 ### ClearML Serving Design Principles 
 
 **Modular** , **Scalable** , **Flexible** , **Customizable** , **Open Source**
-
-<a href="https://excalidraw.com/#json=v0ip945hun2SnO4HVLe0h,QKHfB04TFQLds3_4aqeBjQ"><img src="https://github.com/allegroai/clearml-serving/blob/dev/docs/design_diagram.png?raw=true" width="100%"></a>
 
 ## Installation
 
