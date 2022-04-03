@@ -24,7 +24,7 @@ It enables model deployment including serving and preprocessing code to a Kubern
 ### :fire: NEW :confetti_ball: Take it for a spin with a simple `docker-compose` [command](#nail_care-initial-setup) :magic_wand: :sparkles: 
 
 
-<a href="https://excalidraw.com/#json=jiPWui2cpyOmQh1hTDYue,538MVKS-YCrTGw_1LzKqog"><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/design_diagram.png?raw=true" width="100%"></a>
+<a><img src="https://github.com/allegroai/clearml-serving/blob/main/docs/design_diagram.png?raw=true" width="100%"></a>
 
 Features:
 * Easy to deploy & configure
