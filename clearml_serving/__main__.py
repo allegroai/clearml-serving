@@ -351,7 +351,7 @@ def cli():
         help='External Kafka service url. example: 127.0.0.1:9092')
     parser_config.add_argument(
         '--metric-log-freq', type=float,
-        help='Set default metric logging frequency. 1.0 is 100% of all requests are logged')
+        help='Set default metric logging frequency. 1.0 is 100%% of all requests are logged')
     parser_config.set_defaults(func=func_config_service)
 
     parser_model = subparsers.add_parser('model', help='Configure Model endpoints for an already running Service')
