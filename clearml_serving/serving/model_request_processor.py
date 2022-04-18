@@ -228,7 +228,8 @@ class ModelRequestProcessor(object):
             if len(models) > 1:
                 print("Warning: Found multiple Models for \'{}\', selecting id={}".format(model_query, models[0].id))
             endpoint.model_id = models[0].id
-        elif not endpoint.model_id:
+        elif not endpoint.model_id and endpoint.engine_type != "custom":
+            # if the "engine_type" is "custom" it might be there is no model_id attached
             print("Warning: No Model provided for \'{}\'".format(url))
 
         # upload as new artifact

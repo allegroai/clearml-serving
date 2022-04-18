@@ -71,6 +71,8 @@ class BasePreprocessRequest(object):
         Preprocess.send_request = BasePreprocessRequest._preprocess_send_request
         # create preprocess class
         self._preprocess = Preprocess()
+        # update the model endpoint on the instance we created
+        self._preprocess.model_endpoint = self.model_endpoint
         # custom model load callback function
         if callable(getattr(self._preprocess, 'load', None)):
             self._model = self._preprocess.load(self._get_local_model_file())
@@ -129,6 +131,8 @@ class BasePreprocessRequest(object):
         pass
 
     def _get_local_model_file(self):
+        if not self.model_endpoint.model_id:
+            return None
         model_repo_object = Model(model_id=self.model_endpoint.model_id)
         return model_repo_object.get_local_copy()
 

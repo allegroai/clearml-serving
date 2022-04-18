@@ -12,7 +12,8 @@ class Preprocess(object):
 
     def __init__(self):
         # set internal state, this will be called only once. (i.e. not per request)
-        pass
+        # it will also set the internal model_endpoint to reference the specific model endpoint object being served
+        self.model_endpoint = None  # type: clearml_serving.serving.endpoints.ModelEndpoint
 
     def load(self, local_file_name: str) -> Optional[Any]:  # noqa
         """
