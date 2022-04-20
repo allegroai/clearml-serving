@@ -153,7 +153,7 @@ AZURE_STORAGE_KEY
   - create new python virtual environment
   - `pip3 install -r examples/sklearn/requirements.txt`
   - `python3 examples/sklearn/train_model.py`
-  - Model was automatically registered and uploaded into the model repository. For Manual model registration see [here](#registering--deploying-new-models-manually) 
+  - Model was automatically registered and uploaded into the model repository. For Manual model registration see [here](#turtle-registering--deploying-new-models-manually) 
 2. Register the new Model on the Serving Service
   - `clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples"`
   - **Notice** the preprocessing python code is packaged and uploaded to the "Serving Service", to be used by any inference container, and downloaded in realtime when updated
