@@ -1,4 +1,4 @@
-# Train and Deploy Keras model with Nvidia Triton Engine
+# Train and Deploy Pytorch model with Nvidia Triton Engine
 
 ## training mnist digit classifier model
 
