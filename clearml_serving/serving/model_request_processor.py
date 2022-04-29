@@ -49,8 +49,10 @@ class ModelRequestProcessor(object):
             force_create: bool = False,
     ) -> None:
         """
+        ModelRequestProcessor constructor
+
         :param task_id: Optional specify existing Task ID of the ServingService
-        :param update_lock_guard: If provided use external (usually multi-process) lock guard for updates
+        :param update_lock_guard: If provided use external (usually multiprocess) lock guard for updates
         :param name: Optional name current serving service
         :param project: Optional select project for the current serving service
         :param tags: Optional add tags to the serving service
@@ -457,7 +459,8 @@ class ModelRequestProcessor(object):
             for k, v in canary_ep.items()
         }
         metric_logging = {
-            k: EndpointMetricLogging(**{i: j for i, j in v.items() if hasattr(EndpointMetricLogging.__attrs_attrs__, i)})
+            k: EndpointMetricLogging(**{i: j for i, j in v.items()
+                                        if hasattr(EndpointMetricLogging.__attrs_attrs__, i)})
             for k, v in metric_logging.items()
         }
 
@@ -649,7 +652,7 @@ class ModelRequestProcessor(object):
             versions = sorted(current_served_models.keys(), reverse=True)
 
             # notice, most updated model first
-            # first select only the new models
+            # select only the new models
             model_ids = [m.id for m in models]
 
             # we want last updated model to be last (so it gets the highest version number)
