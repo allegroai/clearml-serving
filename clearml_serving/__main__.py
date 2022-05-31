@@ -67,7 +67,7 @@ def func_metric_add(args):
         name = v.strip()
         if name in metric.metrics:
             print("Warning: {} defined twice".format(name))
-        metric.metrics[name] = dict(type="variable", buckets=None)
+        metric.metrics[name] = dict(type="value", buckets=None)
 
     if not request_processor.add_metric_logging(metric=metric):
         raise ValueError("Could not add metric logging endpoint {}".format(args.endpoint))
