@@ -428,6 +428,8 @@ class ModelRequestProcessor(object):
         """
         if not task:
             task = self._task
+
+        task.reload()
         configuration = task.get_parameters_as_dict().get("General") or {}
         endpoints = task.get_configuration_object_as_dict(name='endpoints') or {}
         canary_ep = task.get_configuration_object_as_dict(name='canary') or {}
