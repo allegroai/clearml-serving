@@ -323,7 +323,7 @@ class StatisticsController(object):
         metric_cls = self._metric_type_class.get(metric_.type)
         if not metric_cls:
             return None
-        if metric_cls in (Histogram, EnumHistogram):
+        if metric_cls in (ScalarHistogram, EnumHistogram):
             return metric_cls(
                 name=name,
                 documentation="User defined metric {}".format(metric_.type),
