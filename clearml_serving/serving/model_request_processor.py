@@ -1029,9 +1029,10 @@ class ModelRequestProcessor(object):
                 collect_stats = True
 
         tic = time()
-        preprocessed = processor.preprocess(body, stats_collect_fn)
-        processed = processor.process(preprocessed, stats_collect_fn)
-        return_value = processor.postprocess(processed, stats_collect_fn)
+        state = dict()
+        preprocessed = processor.preprocess(body, state, stats_collect_fn)
+        processed = processor.process(preprocessed, state, stats_collect_fn)
+        return_value = processor.postprocess(processed, state, stats_collect_fn)
         tic = time() - tic
         if collect_stats:
             # 10th of a millisecond should be enough

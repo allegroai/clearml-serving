@@ -1,4 +1,4 @@
-from typing import Any, Optional, List, Callable
+from typing import Any, Optional, Callable
 
 
 # Preprocess class Must be named "Preprocess"
@@ -24,12 +24,24 @@ class Preprocess(object):
         """
         pass
 
-    def preprocess(self, body: dict, collect_custom_statistics_fn: Optional[Callable[[dict], None]]) -> Any:  # noqa
+    def preprocess(
+            self,
+            body: dict,
+            state: dict,
+            collect_custom_statistics_fn: Optional[Callable[[dict], None]],
+    ) -> Any:  # noqa
         """
         Optional: do something with the request data, return any type of object.
         The returned object will be passed as is to the inference engine
 
         :param body: dictionary as recieved from the RestAPI
+        :param state: Use state dict to store data passed to the post-processing function call.
+            This is a per-request state dict (meaning a new empty dict will be passed per request)
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, if provided allows to send a custom set of key/values
             to the statictics collector servicd.
             None is passed if statiscs collector is not configured, or if the current request should not be collected
@@ -44,12 +56,24 @@ class Preprocess(object):
         """
         return body
 
-    def postprocess(self, data: Any, collect_custom_statistics_fn: Optional[Callable[[dict], None]]) -> dict:  # noqa
+    def postprocess(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Optional[Callable[[dict], None]],
+    ) -> dict:  # noqa
         """
         Optional: post process the data returned from the model inference engine
         returned dict will be passed back as the request result as is.
 
         :param data: object as recieved from the inference model function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            This is a per-request state dict (meaning a dict instance per request)
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, if provided allows to send a custom set of key/values
             to the statictics collector servicd.
             None is passed if statiscs collector is not configured, or if the current request should not be collected
@@ -62,12 +86,24 @@ class Preprocess(object):
         """
         return data
 
-    def process(self, data: Any, collect_custom_statistics_fn: Optional[Callable[[dict], None]]) -> Any:  # noqa
+    def process(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Optional[Callable[[dict], None]],
+    ) -> Any:  # noqa
         """
         Optional: do something with the actual data, return any type of object.
         The returned object will be passed as is to the postprocess function engine
 
         :param data: object as recieved from the preprocessing function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            This is a per-request state dict (meaning a dict instance per request)
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, if provided allows to send a custom set of key/values
             to the statictics collector servicd.
             None is passed if statiscs collector is not configured, or if the current request should not be collected

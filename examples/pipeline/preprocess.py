@@ -8,14 +8,14 @@ class Preprocess(object):
         # set internal state, this will be called only once. (i.e. not per request)
         self.executor = ThreadPoolExecutor(max_workers=32)
 
-    def postprocess(self, data: List[dict], collect_custom_statistics_fn=None) -> dict:
+    def postprocess(self, data: List[dict], state: dict, collect_custom_statistics_fn=None) -> dict:
         # we will here average the results and return the new value
         # assume data is a list of dicts greater than 1
 
         # average result
         return dict(y=0.5 * data[0]['y'][0] + 0.5 * data[1]['y'][0])
 
-    def process(self, data: Any, collect_custom_statistics_fn=None) -> Any:
+    def process(self, data: Any, state: dict, collect_custom_statistics_fn=None) -> Any:
         """
         do something with the actual data, return any type of object.
         The returned object will be passed as is to the postprocess function engine

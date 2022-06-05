@@ -46,7 +46,7 @@ class BasePreprocessRequest(object):
 
     def _instantiate_custom_preprocess_cls(self, task: Task) -> None:
         path = task.artifacts[self.model_endpoint.preprocess_artifact].get_local_copy()
-        # check file content hash, should only happens once?!
+        # check file content hash, should only happen once?!
         # noinspection PyProtectedMember
         file_hash, _ = sha256sum(path, block_size=Artifacts._hash_block_size)
         if file_hash != task.artifacts[self.model_endpoint.preprocess_artifact].hash:
@@ -77,12 +77,23 @@ class BasePreprocessRequest(object):
         if callable(getattr(self._preprocess, 'load', None)):
             self._model = self._preprocess.load(self._get_local_model_file())
 
-    def preprocess(self, request: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Optional[Any]:
+    def preprocess(
+            self,
+            request: dict,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None,
+    ) -> Optional[Any]:
         """
         Raise exception to report an error
         Return value will be passed to serving engine
 
         :param request: dictionary as recieved from the RestAPI
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
             to the statictics collector servicd
 
@@ -94,15 +105,26 @@ class BasePreprocessRequest(object):
         :return: Object to be passed directly to the model inference
         """
         if self._preprocess is not None and hasattr(self._preprocess, 'preprocess'):
-            return self._preprocess.preprocess(request, collect_custom_statistics_fn)
+            return self._preprocess.preprocess(request, state, collect_custom_statistics_fn)
         return request
 
-    def postprocess(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Optional[dict]:
+    def postprocess(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None
+    ) -> Optional[dict]:
         """
         Raise exception to report an error
         Return value will be passed to serving engine
 
         :param data: object as recieved from the inference model function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
             to the statictics collector servicd
 
@@ -112,14 +134,25 @@ class BasePreprocessRequest(object):
         :return: Dictionary passed directly as the returned result of the RestAPI
         """
         if self._preprocess is not None and hasattr(self._preprocess, 'postprocess'):
-            return self._preprocess.postprocess(data, collect_custom_statistics_fn)
+            return self._preprocess.postprocess(data, state, collect_custom_statistics_fn)
         return data
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None
+    ) -> Any:
         """
-        The actual processing function. Can be send to external service
+        The actual processing function. Can be sent to external service
 
         :param data: object as recieved from the preprocessing function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
             to the statictics collector servicd
 
@@ -178,7 +211,7 @@ class BasePreprocessRequest(object):
                 pass
 
     @staticmethod
-    def _preprocess_send_request(self, endpoint: str, version: str = None, data: dict = None) -> Optional[dict]:
+    def _preprocess_send_request(_, endpoint: str, version: str = None, data: dict = None) -> Optional[dict]:
         endpoint = "{}/{}".format(endpoint.strip("/"), version.strip("/")) if version else endpoint.strip("/")
         base_url = BasePreprocessRequest.get_server_config().get("base_serving_url")
         base_url = (base_url or BasePreprocessRequest._default_serving_base_url).strip("/")
@@ -226,12 +259,23 @@ class TritonPreprocessRequest(BasePreprocessRequest):
             self._ext_service_pb2 = service_pb2
             self._ext_service_pb2_grpc = service_pb2_grpc
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None
+    ) -> Any:
         """
         The actual processing function.
         Detect gRPC server and send the request to it
 
         :param data: object as recieved from the preprocessing function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
         :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
             to the statictics collector servicd
 
@@ -240,9 +284,9 @@ class TritonPreprocessRequest(BasePreprocessRequest):
 
         :return: Object to be passed tp the post-processing function
         """
-        # allow to override bt preprocessing class
+        # allow overriding the process method
         if self._preprocess is not None and hasattr(self._preprocess, "process"):
-            return self._preprocess.process(data, collect_custom_statistics_fn)
+            return self._preprocess.process(data, state, collect_custom_statistics_fn)
 
         # Create gRPC stub for communicating with the server
         triton_server_address = self._server_config.get("triton_grpc_server") or self._default_grpc_address
@@ -316,7 +360,7 @@ class SKLearnPreprocessRequest(BasePreprocessRequest):
             import joblib  # noqa
             self._model = joblib.load(filename=self._get_local_model_file())
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(self, data: Any, state: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
         """
         The actual processing function.
         We run the model in this context
@@ -335,7 +379,7 @@ class XGBoostPreprocessRequest(BasePreprocessRequest):
             self._model = xgboost.Booster()
             self._model.load_model(self._get_local_model_file())
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(self, data: Any, state: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
         """
         The actual processing function.
         We run the model in this context
@@ -353,7 +397,7 @@ class LightGBMPreprocessRequest(BasePreprocessRequest):
             import lightgbm  # noqa
             self._model = lightgbm.Booster(model_file=self._get_local_model_file())
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(self, data: Any, state: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
         """
         The actual processing function.
         We run the model in this context
@@ -367,11 +411,11 @@ class CustomPreprocessRequest(BasePreprocessRequest):
         super(CustomPreprocessRequest, self).__init__(
             model_endpoint=model_endpoint, task=task)
 
-    def process(self, data: Any, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+    def process(self, data: Any, state: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
         """
         The actual processing function.
         We run the process in this context
         """
         if self._preprocess is not None and hasattr(self._preprocess, 'process'):
-            return self._preprocess.process(data, collect_custom_statistics_fn)
+            return self._preprocess.process(data, state, collect_custom_statistics_fn)
         return None
