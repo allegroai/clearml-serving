@@ -22,11 +22,17 @@ def func_metric_rm(args):
     print("Serving service Task {}, Removing metrics from endpoint={}".format(
         request_processor.get_id(), args.endpoint))
     request_processor.deserialize(skip_sync=True)
-    for v in (args.variable or []):
-        if request_processor.remove_metric_logging(endpoint=args.endpoint, variable_name=v):
-            print("Removing static endpoint: {}".format(args.endpoint))
+    if not args.variable:
+        if request_processor.remove_metric_logging(endpoint=args.endpoint):
+            print("Removing metric endpoint: {}".format(args.endpoint))
         else:
-            raise ValueError("Could not remove {} from endpoin {}".format(v, args.endpoint))
+            raise ValueError("Could not remove metric endpoint {}".format(args.endpoint))
+    else:
+        for v in args.variable:
+            if request_processor.remove_metric_logging(endpoint=args.endpoint, variable_name=v):
+                print("Removing metric endpoint: {} / {}".format(args.endpoint, v))
+            else:
+                raise ValueError("Could not remove metric {} from endpoint {}".format(v, args.endpoint))
     print("Updating serving service")
     request_processor.serialize()
 
@@ -69,7 +75,7 @@ def func_metric_add(args):
             print("Warning: {} defined twice".format(name))
         metric.metrics[name] = dict(type="value", buckets=None)
 
-    if not request_processor.add_metric_logging(metric=metric):
+    if not request_processor.add_metric_logging(metric=metric, update=True):
         raise ValueError("Could not add metric logging endpoint {}".format(args.endpoint))
 
     print("Updating serving service")
@@ -332,7 +338,7 @@ def cli():
     parser_metrics_rm.add_argument(
         '--endpoint', type=str, help='metric endpoint name including version, e.g. "model/1" or a prefix "model/*"')
     parser_metrics_rm.add_argument(
-        '--variable', type=str, nargs='+',
+        '--variable', type=str, nargs='*',
         help='Remove (scalar/enum) argument from the metric logger, <name> example: "x1"')
     parser_metrics_rm.set_defaults(func=func_metric_rm)
 
