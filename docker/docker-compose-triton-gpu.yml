@@ -12,7 +12,7 @@ services:
       - clearml-serving-backend
 
   kafka:
-    image: bitnami/kafka:3.1.0
+    image: bitnami/kafka:3.1.1
     container_name: clearml-serving-kafka
     # ports:
       # - "9092:9092"
@@ -94,6 +94,7 @@ services:
       CLEARML_DEFAULT_TRITON_GRPC_ADDR: ${CLEARML_DEFAULT_TRITON_GRPC_ADDR:-clearml-serving-triton:8001}
       CLEARML_USE_GUNICORN: ${CLEARML_USE_GUNICORN:-}
       CLEARML_SERVING_NUM_PROCESS: ${CLEARML_SERVING_NUM_PROCESS:-}
+      CLEARML_EXTRA_PYTHON_PACKAGES: ${CLEARML_EXTRA_PYTHON_PACKAGES:-}
     depends_on:
       - kafka
       - clearml-serving-triton
