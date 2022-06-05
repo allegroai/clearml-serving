@@ -12,6 +12,7 @@
 [![PyPI pyversions](https://img.shields.io/pypi/pyversions/clearml-serving.svg)](https://img.shields.io/pypi/pyversions/clearml-serving.svg)
 [![PyPI version shields.io](https://img.shields.io/pypi/v/clearml-serving.svg)](https://img.shields.io/pypi/v/clearml-serving.svg)
 [![PyPI status](https://img.shields.io/pypi/status/clearml-serving.svg)](https://pypi.python.org/pypi/clearml-serving/)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/allegroai)](https://artifacthub.io/packages/helm/allegroai/clearml-serving)
 [![Slack Channel](https://img.shields.io/badge/slack-%23clearml--community-blueviolet?logo=slack)](https://join.slack.com/t/allegroai-trains/shared_invite/zt-c0t13pty-aVUZZW1TSSSg2vyIGVPBhg)
 
 
@@ -322,7 +323,7 @@ Grafana model performance example:
   - [x] Kafka install instructions
   - [x] Prometheus install instructions
   - [x] Grafana install instructions
-  - [ ] Kubernetes Helm Chart
+  - [x] Kubernetes Helm Chart
 
 ## Contributing
 
