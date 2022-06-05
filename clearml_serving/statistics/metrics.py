@@ -338,7 +338,7 @@ class StatisticsController(object):
             self.task.id, os.getpid(), poll_freq_sec))
         while True:
             try:
-                self._serving_service.deserialize()
+                self._serving_service.reload()
                 endpoint_metrics = self._serving_service.list_endpoint_logging()
                 self._last_sync_time = time()
                 if self._current_endpoints == endpoint_metrics:
