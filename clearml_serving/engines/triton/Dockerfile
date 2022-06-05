@@ -1,5 +1,5 @@
 
-FROM nvcr.io/nvidia/tritonserver:22.02-py3
+FROM nvcr.io/nvidia/tritonserver:22.04-py3
 
 
 ENV LC_ALL=C.UTF-8
