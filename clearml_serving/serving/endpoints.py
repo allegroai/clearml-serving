@@ -83,8 +83,12 @@ class EndpointMetricLogging(BaseStruct):
 
     metrics = attrib(
         type=dict, default={},
-        converter=lambda x: {k: v if isinstance(v, EndpointMetricLogging.MetricType)
-        else EndpointMetricLogging.MetricType(**v) for k, v in x.items()})  # key=variable, value=MetricType)
+        converter=lambda x: {
+            k: v if isinstance(v, EndpointMetricLogging.MetricType)
+            else EndpointMetricLogging.MetricType(**v) for k, v in x.items()
+        }
+    )  # key=variable, value=MetricType
+
     # example:
     # {"x1": dict(type="scalar", buckets=[0,1,2,3]),
     #  "y": dict(type="enum", buckets=["cat", "dog"]).
