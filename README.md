@@ -324,6 +324,7 @@ Grafana model performance example:
   - [x] Prometheus install instructions
   - [x] Grafana install instructions
   - [x] Kubernetes Helm Chart
+  - [ ] Intel optimized container (python, numpy, daal, scikit-learn)
 
 ## Contributing
 
