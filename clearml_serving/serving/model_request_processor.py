@@ -808,6 +808,7 @@ class ModelRequestProcessor(object):
         self._task.mark_started(force=True)
         self._report_text("Launching - configuration sync every {} sec".format(poll_frequency_sec))
         cleanup = False
+        model_monitor_update = False
         self._update_serving_plot()
         while True:
             try:
@@ -823,21 +824,24 @@ class ModelRequestProcessor(object):
                     # update endpoints
                     self.deserialize(self._task)
                     # mark clean up for next round
-                    cleanup = True
+                    model_monitor_update = True
                 # update serving layout plot
-                if cleanup:
+                if cleanup or model_monitor_update:
                     self._update_serving_plot()
+                if cleanup:
+                    self._engine_processor_lookup = dict()
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
             sleep(poll_frequency_sec)
             try:
                 # we assume that by now all old deleted endpoints requests already returned
-                if cleanup:
-                    cleanup = False
+                if model_monitor_update and not cleanup:
                     for k in list(self._engine_processor_lookup.keys()):
                         if k not in self._endpoints:
                             # atomic
                             self._engine_processor_lookup.pop(k, None)
+                cleanup = False
+                model_monitor_update = False
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
 
