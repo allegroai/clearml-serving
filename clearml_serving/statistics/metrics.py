@@ -7,7 +7,7 @@ from threading import Event, Thread
 from time import time, sleep
 
 from clearml import Task
-from typing import Optional, Dict, Any, Iterable
+from typing import Optional, Dict, Any, Iterable, Set
 
 from prometheus_client import Histogram, Enum, Gauge, Counter, values
 from kafka import KafkaConsumer
@@ -204,6 +204,7 @@ class StatisticsController(object):
         self._poll_frequency_min = float(poll_frequency_min)
         self._serving_service = None  # type: Optional[ModelRequestProcessor]
         self._current_endpoints = {}  # type: Optional[Dict[str, EndpointMetricLogging]]
+        self._auto_added_endpoints = set()  # type: Set[str]
         self._prometheus_metrics = {}  # type: Optional[Dict[str, Dict[str, MetricWrapperBase]]]
         self._timestamp = time()
         self._sync_thread = None
@@ -242,45 +243,47 @@ class StatisticsController(object):
         for message in consumer:
             # noinspection PyBroadException
             try:
-                data = json.loads(message.value.decode("utf-8"))
+                list_data = json.loads(message.value.decode("utf-8"))
             except Exception:
                 print("Warning: failed to decode kafka stats message")
                 continue
-            try:
-                url = data.pop("_url", None)
-                if not url:
-                    # should not happen
-                    continue
-                endpoint_metric = self._current_endpoints.get(url)
-                if not endpoint_metric:
-                    # add default one, we will just log the reserved valued:
-                    endpoint_metric = dict()
-                    self._current_endpoints[url] = EndpointMetricLogging(endpoint=url)
-                    # we should sync,
-                    if time()-self._last_sync_time > self._sync_threshold_sec:
-                        self._last_sync_time = time()
-                        self._sync_event.set()
+            for data in list_data:
+                try:
+                    url = data.pop("_url", None)
+                    if not url:
+                        # should not happen
+                        continue
+                    endpoint_metric = self._current_endpoints.get(url)
+                    if not endpoint_metric:
+                        # add default one, we will just log the reserved valued:
+                        endpoint_metric = dict()
+                        self._current_endpoints[url] = EndpointMetricLogging(endpoint=url)
+                        self._auto_added_endpoints.add(url)
+                        # we should sync,
+                        if time()-self._last_sync_time > self._sync_threshold_sec:
+                            self._last_sync_time = time()
+                            self._sync_event.set()
 
-                metric_url_log = self._prometheus_metrics.get(url)
-                if not metric_url_log:
-                    # create a new one
-                    metric_url_log = dict()
-                    self._prometheus_metrics[url] = metric_url_log
+                    metric_url_log = self._prometheus_metrics.get(url)
+                    if not metric_url_log:
+                        # create a new one
+                        metric_url_log = dict()
+                        self._prometheus_metrics[url] = metric_url_log
 
-                # check if we have the prometheus_logger
-                for k, v in data.items():
-                    prometheus_logger = metric_url_log.get(k)
-                    if not prometheus_logger:
-                        prometheus_logger = self._create_prometheus_logger_class(url, k, endpoint_metric)
+                    # check if we have the prometheus_logger
+                    for k, v in data.items():
+                        prometheus_logger = metric_url_log.get(k)
                         if not prometheus_logger:
-                            continue
-                        metric_url_log[k] = prometheus_logger
+                            prometheus_logger = self._create_prometheus_logger_class(url, k, endpoint_metric)
+                            if not prometheus_logger:
+                                continue
+                            metric_url_log[k] = prometheus_logger
 
-                    self._report_value(prometheus_logger, v)
+                        self._report_value(prometheus_logger, v)
 
-            except Exception as ex:
-                print("Warning: failed to report stat to Prometheus: {}".format(ex))
-                continue
+                except Exception as ex:
+                    print("Warning: failed to report stat to Prometheus: {}".format(ex))
+                    continue
 
     @staticmethod
     def _report_value(prometheus_logger: Optional[MetricWrapperBase], v: Any) -> bool:
@@ -341,14 +344,20 @@ class StatisticsController(object):
                 self._serving_service.reload()
                 endpoint_metrics = self._serving_service.list_endpoint_logging()
                 self._last_sync_time = time()
-                if self._current_endpoints == endpoint_metrics:
+                # we might have added new urls (auto metric logging), we need to compare only configured keys
+                current_endpoints = {
+                    k: v for k, v in self._current_endpoints.items()
+                    if k not in self._auto_added_endpoints}
+                if current_endpoints == endpoint_metrics:
                     self._sync_event.wait(timeout=poll_freq_sec)
                     self._sync_event.clear()
                     continue
 
                 # update metrics:
                 self._dirty = True
-                self._current_endpoints = deepcopy(endpoint_metrics)
+                self._auto_added_endpoints -= set(endpoint_metrics.keys())
+                # merge top level configuration (we might have auto logged url endpoints)
+                self._current_endpoints.update(deepcopy(endpoint_metrics))
                 print("New configuration synced")
             except Exception as ex:
                 print("Warning: failed to sync state from serving service Task: {}".format(ex))

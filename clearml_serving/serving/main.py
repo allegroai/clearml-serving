@@ -87,7 +87,7 @@ router = APIRouter(
 @router.post("/{model_id}/{version}")
 @router.post("/{model_id}/")
 @router.post("/{model_id}")
-def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
+async def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
     try:
         return_value = processor.process_request(
             base_url=model_id,

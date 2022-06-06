@@ -1,7 +1,8 @@
 import json
 import os
+from collections import deque
 from pathlib import Path
-from queue import Queue
+# from queue import Queue
 from random import random
 from time import sleep, time
 from typing import Optional, Union, Dict, List
@@ -30,6 +31,37 @@ class FastWriteCounter(object):
 
     def value(self):
         return next(self._counter_inc) - next(self._counter_dec)
+
+
+class FastSimpleQueue(object):
+    _default_wait_timeout = 10
+
+    def __init__(self):
+        self._deque = deque()
+        # Notify not_empty whenever an item is added to the queue; a
+        # thread waiting to get is notified then.
+        self._not_empty = threading.Event()
+        self._last_notify = time()
+
+    def put(self, a_object, block=True):
+        self._deque.append(a_object)
+        if time() - self._last_notify > self._default_wait_timeout:
+            self._not_empty.set()
+            self._last_notify = time()
+
+    def get(self, block=True):
+        while True:
+            try:
+                return self._deque.popleft()
+            except IndexError:
+                if not block:
+                    return None
+                # wait until signaled
+                try:
+                    if self._not_empty.wait(timeout=self._default_wait_timeout):
+                        self._not_empty.clear()
+                except Exception as ex:  # noqa
+                    pass
 
 
 class ModelRequestProcessor(object):
@@ -75,7 +107,7 @@ class ModelRequestProcessor(object):
         self._last_update_hash = None
         self._sync_daemon_thread = None
         self._stats_sending_thread = None
-        self._stats_queue = Queue()
+        self._stats_queue = FastSimpleQueue()
         # this is used for Fast locking mechanisms (so we do not actually need to use Locks)
         self._update_lock_flag = False
         self._request_processing_state = FastWriteCounter()
@@ -99,7 +131,7 @@ class ModelRequestProcessor(object):
         if self._update_lock_flag:
             self._request_processing_state.dec()
             while self._update_lock_flag:
-                sleep(1)
+                sleep(0.5+random())
             # retry to process
             return self.process_request(base_url=base_url, version=version, request_body=request_body)
 
@@ -820,6 +852,7 @@ class ModelRequestProcessor(object):
         print("Starting Kafka Statistics reporting: {}".format(self._kafka_stats_url))
 
         from kafka import KafkaProducer  # noqa
+        import kafka.errors as Errors  # noqa
 
         while True:
             try:
@@ -836,16 +869,35 @@ class ModelRequestProcessor(object):
 
         while True:
             try:
-                stats_dict = self._stats_queue.get(block=True)
+                stats_list_dict = [self._stats_queue.get(block=True)]
+                while True:
+                    v = self._stats_queue.get(block=False)
+                    if v is None:
+                        break
+                    stats_list_dict.append(v)
             except Exception as ex:
                 print("Warning: Statistics thread exception: {}".format(ex))
                 break
-            # send into kafka service
-            try:
-                producer.send(self._kafka_topic, value=stats_dict).get()
-            except Exception as ex:
-                print("Warning: Failed to send statistics packet to Kafka service: {}".format(ex))
-                pass
+
+            left_overs = []
+            while stats_list_dict or left_overs:
+                if not stats_list_dict:
+                    stats_list_dict = left_overs
+                    left_overs = []
+
+                # send into kafka service
+                try:
+                    producer.send(self._kafka_topic, value=stats_list_dict).get()
+                    stats_list_dict = []
+                except Errors.MessageSizeTooLargeError:
+                    # log.debug("Splitting Kafka message in half [{}]".format(len(stats_list_dict)))
+                    # split in half - message is too long for kafka to send
+                    left_overs += stats_list_dict[len(stats_list_dict)//2:]
+                    stats_list_dict = stats_list_dict[:len(stats_list_dict)//2]
+                    continue
+                except Exception as ex:
+                    print("Warning: Failed to send statistics packet to Kafka service: {}".format(ex))
+                    break
 
     def get_id(self) -> str:
         return self._task.id
@@ -1046,9 +1098,9 @@ class ModelRequestProcessor(object):
 
     def _process_request(self, processor: BasePreprocessRequest, url: str, body: dict) -> dict:
         # collect statistics for this request
-        stats = {}
         stats_collect_fn = None
         collect_stats = False
+        custom_stats = dict()
         freq = 1
         # decide if we are collecting the stats
         metric_endpoint = self._metric_logging.get(url)
@@ -1056,8 +1108,8 @@ class ModelRequestProcessor(object):
             freq = metric_endpoint.log_frequency if metric_endpoint and metric_endpoint.log_frequency is not None \
                 else self._metric_log_freq
 
-            if freq and random() <= freq:
-                stats_collect_fn = stats.update
+            if freq and (freq >= 1 or random() <= freq):
+                stats_collect_fn = custom_stats.update
                 collect_stats = True
 
         tic = time()
@@ -1067,21 +1119,25 @@ class ModelRequestProcessor(object):
         return_value = processor.postprocess(processed, state, stats_collect_fn)
         tic = time() - tic
         if collect_stats:
-            # 10th of a millisecond should be enough
-            stats['_latency'] = round(tic, 4)
-            stats['_count'] = int(1.0/freq)
-            stats['_url'] = url
+            stats = dict(
+                _latency=round(tic, 4),  # 10th of a millisecond should be enough
+                _count=int(1.0/freq),
+                _url=url
+            )
 
-            # collect inputs
-            if metric_endpoint and body:
-                for k, v in body.items():
-                    if k in metric_endpoint.metrics:
-                        stats[k] = v
-            # collect outputs
-            if metric_endpoint and return_value:
-                for k, v in return_value.items():
-                    if k in metric_endpoint.metrics:
-                        stats[k] = v
+            if custom_stats:
+                stats.update(custom_stats)
+
+            if metric_endpoint:
+                metric_keys = set(metric_endpoint.metrics.keys())
+                # collect inputs
+                if body:
+                    keys = set(body.keys()) & metric_keys
+                    stats.update({k: body[k] for k in keys})
+                # collect outputs
+                if return_value:
+                    keys = set(return_value.keys()) & metric_keys
+                    stats.update({k: return_value[k] for k in keys})
 
             # send stats in background, push it into a thread queue
             # noinspection PyBroadException
