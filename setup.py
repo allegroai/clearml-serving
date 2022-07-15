@@ -43,7 +43,7 @@ setup(
     author_email='support@clear.ml',
     license='Apache License 2.0',
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'Operating System :: POSIX :: Linux',
@@ -58,6 +58,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'License :: OSI Approved :: Apache Software License',
     ],
     keywords='clearml mlops devops trains development machine deep learning version control machine-learning '
