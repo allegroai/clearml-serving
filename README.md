@@ -291,6 +291,7 @@ Grafana model performance example:
 - PyTorch [example](examples/pytorch/readme.md) - mnist dataset
 - TensorFlow/Keras [example](examples/keras/readme.md) - mnist dataset
 - Model Pipeline [example](examples/pipeline/readme.md) - random data
+- Custom Model [example](examples/custom/readme.md) - custom data
 
 ### :pray: Status
 
