@@ -471,7 +471,7 @@ def cli():
         help='Optional: Specify the model layer pulling results from, examples: layer_99'
     )
     parser_model_monitor.add_argument(
-        '--aux-config', type=int, nargs='+',
+        '--aux-config', nargs='+',
         help='Specify additional engine specific auxiliary configuration in the form of key=value. '
              'Example: platform=onnxruntime_onnx response_cache.enable=true max_batch_size=8 '
              'Notice: you can also pass full configuration file (e.g. Triton "config.pbtxt")'
