@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 from typing import Optional, Any, Callable, List
 
 import numpy as np
@@ -45,7 +47,10 @@ class BasePreprocessRequest(object):
                         self.model_endpoint.preprocess_artifact, ex))
 
     def _instantiate_custom_preprocess_cls(self, task: Task) -> None:
-        path = task.artifacts[self.model_endpoint.preprocess_artifact].get_local_copy()
+        path = task.artifacts[self.model_endpoint.preprocess_artifact].get_local_copy(extract_archive=False)
+        if not path or not Path(path).exists():
+            raise ValueError("Artifact '{}' could not be downloaded".format(self.model_endpoint.preprocess_artifact))
+
         # check file content hash, should only happen once?!
         # noinspection PyProtectedMember
         file_hash, _ = sha256sum(path, block_size=Artifacts._hash_block_size)
@@ -63,9 +68,21 @@ class BasePreprocessRequest(object):
             )
 
         import importlib.util
-        spec = importlib.util.spec_from_file_location("Preprocess", path)
-        _preprocess = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(_preprocess)
+        if Path(path).is_file():
+            spec = importlib.util.spec_from_file_location("Preprocess", path)
+            _preprocess = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(_preprocess)
+        else:
+            submodules_path = [Path(path).as_posix()] + sys.path
+            module_name = str(self.model_endpoint.preprocess_artifact).replace(".", "_")
+            spec = importlib.util.spec_from_file_location(
+                module_name, location=(Path(path) / "__init__.py").as_posix(),
+                submodule_search_locations=submodules_path,
+            )
+            _preprocess = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = _preprocess
+            spec.loader.exec_module(_preprocess)
+
         Preprocess = _preprocess.Preprocess  # noqa
         # override `send_request` method
         Preprocess.send_request = BasePreprocessRequest._preprocess_send_request
