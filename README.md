@@ -5,7 +5,7 @@
 
 **ClearML Serving - Model deployment made easy**
 
-## **`clearml-serving v1.0` </br> :sparkles: Model Serving (ML/DL) Made Easy :tada:**
+## **`clearml-serving v1.1` </br> :sparkles: Model Serving (ML/DL) Made Easy :tada:**
 
 
 [![GitHub license](https://img.shields.io/github/license/allegroai/clearml-serving.svg)](https://img.shields.io/github/license/allegroai/clearml-serving.svg)
