@@ -1,5 +1,6 @@
 torchvision
 torch
 clearml
-PIL
+Pillow
 setuptools<58
+tensorboard
