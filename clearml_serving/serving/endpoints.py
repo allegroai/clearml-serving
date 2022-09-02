@@ -9,8 +9,28 @@ def _engine_validator(inst, attr, value):  # noqa
 
 
 def _matrix_type_validator(inst, attr, value):  # noqa
-    if value and not np.dtype(value):
+    if isinstance(value, (tuple, list)):
+        for v in value:
+            if v and not np.dtype(v):
+                raise TypeError("{} not supported matrix type".format(v))
+
+    elif value and not np.dtype(value):
         raise TypeError("{} not supported matrix type".format(value))
+
+
+def _list_type_convertor(inst):  # noqa
+    if inst is None:
+        return None
+    return inst if isinstance(inst, (tuple, list)) else [inst]
+
+
+def _nested_list_type_convertor(inst):  # noqa
+    if inst is None:
+        return None
+    if isinstance(inst, (tuple, list)) and all(not isinstance(i, (tuple, list)) for i in inst):
+        return [inst]
+    inst = inst if isinstance(inst, (tuple, list)) else [inst]
+    return inst
 
 
 @attrs
@@ -30,12 +50,12 @@ class ModelMonitoring(BaseStruct):
     monitor_tags = attrib(type=list, default=[])  # monitor model tag (for model auto update)
     only_published = attrib(type=bool, default=False)  # only select published models
     max_versions = attrib(type=int, default=None)  # Maximum number of models to keep serving (latest X models)
-    input_size = attrib(type=list, default=None)  # optional,  model matrix size
-    input_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    input_name = attrib(type=str, default=None)  # optional, layer name to push the input to
-    output_size = attrib(type=list, default=None)  # optional, model matrix size
-    output_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    output_name = attrib(type=str, default=None)  # optional, layer name to pull the results from
+    input_size = attrib(type=list, default=None, converter=_nested_list_type_convertor)  # optional,  model matrix size
+    input_type = attrib(type=list, default=None, validator=_matrix_type_validator, converter=_list_type_convertor)
+    input_name = attrib(type=list, default=None, converter=_list_type_convertor)  # optional, input layer names
+    output_size = attrib(type=list, default=None, converter=_nested_list_type_convertor)  # optional, model matrix size
+    output_type = attrib(type=list, default=None, validator=_matrix_type_validator, converter=_list_type_convertor)
+    output_name = attrib(type=list, default=None, converter=_list_type_convertor)  # optional, output layer names
     preprocess_artifact = attrib(
         type=str, default=None)  # optional artifact name storing the model preprocessing code
     auxiliary_cfg = attrib(type=dict, default=None)  # Auxiliary configuration (e.g. triton conf), Union[str, dict]
@@ -49,12 +69,12 @@ class ModelEndpoint(BaseStruct):
     version = attrib(type=str, default="")  # key (version string), default no version
     preprocess_artifact = attrib(
         type=str, default=None)  # optional artifact name storing the model preprocessing code
-    input_size = attrib(type=list, default=None)  # optional,  model matrix size
-    input_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    input_name = attrib(type=str, default=None)  # optional, layer name to push the input to
-    output_size = attrib(type=list, default=None)  # optional, model matrix size
-    output_type = attrib(type=str, default=None, validator=_matrix_type_validator)  # optional, model matrix type
-    output_name = attrib(type=str, default=None)  # optional, layer name to pull the results from
+    input_size = attrib(type=list, default=None, converter=_nested_list_type_convertor)  # optional,  model matrix size
+    input_type = attrib(type=list, default=None, validator=_matrix_type_validator, converter=_list_type_convertor)
+    input_name = attrib(type=list, default=None, converter=_list_type_convertor)  # optional, input layer names
+    output_size = attrib(type=list, default=None, converter=_nested_list_type_convertor)  # optional, model matrix size
+    output_type = attrib(type=list, default=None, validator=_matrix_type_validator, converter=_list_type_convertor)
+    output_name = attrib(type=list, default=None, converter=_list_type_convertor)  # optional, output layer names
     auxiliary_cfg = attrib(type=dict, default=None)  # Optional: Auxiliary configuration (e.g. triton conf), [str, dict]
 
 

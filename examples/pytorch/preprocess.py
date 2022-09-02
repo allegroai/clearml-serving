@@ -22,7 +22,7 @@ class Preprocess(object):
         local_file = StorageManager.get_local_copy(remote_url=url)
         image = Image.open(local_file)
         image = ImageOps.grayscale(image).resize((28, 28))
-        return np.array(image).flatten()
+        return np.array([np.array(image)])
 
     def postprocess(self, data: Any, state: dict, collect_custom_statistics_fn=None) -> dict:
         # post process the data returned from the model inference engine

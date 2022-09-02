@@ -12,7 +12,7 @@ from multiprocessing import Lock
 from numpy.random import choice
 
 from clearml import Task, Model
-from clearml.utilities.dicts import merge_dicts
+from clearml.utilities.dicts import merge_dicts, cast_str_to_bool
 from clearml.storage.util import hash_dict
 from .preprocess_service import BasePreprocessRequest
 from .endpoints import ModelEndpoint, ModelMonitoring, CanaryEP, EndpointMetricLogging
@@ -69,6 +69,7 @@ class ModelRequestProcessor(object):
     _kafka_topic = "clearml_inference_stats"
     _config_key_serving_base_url = "serving_base_url"
     _config_key_triton_grpc = "triton_grpc_server"
+    _config_key_triton_compression = "triton_grpc_compression"
     _config_key_kafka_stats = "kafka_service_server"
     _config_key_def_metric_freq = "metric_logging_freq"
 
@@ -118,6 +119,7 @@ class ModelRequestProcessor(object):
         # deserialized values go here
         self._kafka_stats_url = None
         self._triton_grpc = None
+        self._triton_grpc_compression = None
         self._serving_base_url = None
         self._metric_log_freq = None
 
@@ -173,6 +175,7 @@ class ModelRequestProcessor(object):
             self,
             external_serving_base_url: Optional[str] = None,
             external_triton_grpc_server: Optional[str] = None,
+            external_triton_grpc_compression: Optional[bool] = None,
             external_kafka_service_server: Optional[str] = None,
             default_metric_log_freq: Optional[float] = None,
     ):
@@ -184,6 +187,7 @@ class ModelRequestProcessor(object):
             allowing it to concatenate and combine multiple model requests into one
         :param external_triton_grpc_server: set the external grpc tcp port of the Nvidia Triton clearml container.
             Used by the clearml triton engine class to send inference requests
+        :param external_triton_grpc_compression: set gRPC compression (default: False, no compression)
         :param external_kafka_service_server: Optional, Kafka endpoint for the statistics controller collection.
         :param default_metric_log_freq: Default request metric logging (0 to 1.0, 1. means 100% of requests are logged)
         """
@@ -200,6 +204,13 @@ class ModelRequestProcessor(object):
                 value=str(external_triton_grpc_server),
                 value_type="str",
                 description="external grpc tcp port of the Nvidia Triton ClearML container running"
+            )
+        if external_triton_grpc_compression is not None:
+            self._task.set_parameter(
+                name="General/{}".format(self._config_key_triton_compression),
+                value=str(external_triton_grpc_compression),
+                value_type="bool",
+                description="use external grpc tcp compression"
             )
         if external_kafka_service_server is not None:
             self._task.set_parameter(
@@ -587,6 +598,22 @@ class ModelRequestProcessor(object):
         task.set_configuration_object(name='model_monitoring', config_dict=config_dict)
         config_dict = {k: v.as_dict(remove_null_entries=True) for k, v in self._metric_logging.items()}
         task.set_configuration_object(name='metric_logging', config_dict=config_dict)
+        # store our version
+        from ..version import __version__
+        # noinspection PyProtectedMember
+        if task._get_runtime_properties().get("version") != str(__version__):
+            # noinspection PyProtectedMember
+            task._set_runtime_properties(runtime_properties=dict(version=str(__version__)))
+
+    def get_version(self) -> str:
+        """
+        :return: version number (string) of the ModelRequestProcessor (clearml-serving session)
+        """
+        default_version = "1.0.0"
+        if not self._task:
+            return default_version
+        # noinspection PyProtectedMember
+        return self._task._get_runtime_properties().get("version", default_version)
 
     def _update_canary_lookup(self):
         canary_route = {}
@@ -1086,6 +1113,10 @@ class ModelRequestProcessor(object):
         self._triton_grpc = \
             configuration.get(self._config_key_triton_grpc) or \
             os.environ.get("CLEARML_DEFAULT_TRITON_GRPC_ADDR")
+        self._triton_grpc_compression = \
+            cast_str_to_bool(str(configuration.get(
+                self._config_key_triton_compression, os.environ.get("CLEARML_DEFAULT_TRITON_GRPC_COMPRESSION", '0')
+            )))
         self._serving_base_url = \
             configuration.get(self._config_key_serving_base_url) or \
             os.environ.get("CLEARML_DEFAULT_BASE_SERVE_URL")
@@ -1095,6 +1126,7 @@ class ModelRequestProcessor(object):
         # update back configuration
         self._configuration[self._config_key_kafka_stats] = self._kafka_stats_url
         self._configuration[self._config_key_triton_grpc] = self._triton_grpc
+        self._configuration[self._config_key_triton_compression] = self._triton_grpc_compression
         self._configuration[self._config_key_serving_base_url] = self._serving_base_url
         self._configuration[self._config_key_def_metric_freq] = self._metric_log_freq
         # update preprocessing classes

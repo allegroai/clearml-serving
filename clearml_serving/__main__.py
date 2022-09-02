@@ -1,5 +1,6 @@
 import json
 import os.path
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -7,6 +8,33 @@ from clearml_serving.serving.model_request_processor import ModelRequestProcesso
 from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint, EndpointMetricLogging
 
 verbosity = False
+answer_yes = False
+
+
+def verify_session_version(request_processor):
+    from clearml_serving.version import __version__
+    current_v = float('.'.join(str(__version__).split(".")[:2]))
+    stored_v = float('.'.join(str(request_processor.get_version()).split(".")[:2]))
+    if stored_v != current_v:
+        print(
+            "WARNING: You are about to edit clearml-serving session ID={}\n"
+            "It was created with a different version ({}), you are currently using version {}".format(
+                request_processor.get_id(), stored_v, current_v))
+        print("Do you want to continue [n]/y? ", end="")
+        if answer_yes:
+            print("y")
+        else:
+            should_continue = input().lower()
+            if should_continue not in ("y", "yes"):
+                print("INFO: If you wish to downgrade your clearml-serving CLI use "
+                      "`pip3 install clearml-serving=={}`".format(request_processor.get_version()))
+                sys.exit(0)
+
+
+def safe_ModelRequestProcessor(*args, **kwargs):
+    request_processor = ModelRequestProcessor(*args, **kwargs)
+    verify_session_version(request_processor)
+    return request_processor
 
 
 def func_metric_ls(args):
@@ -18,9 +46,10 @@ def func_metric_ls(args):
 
 
 def func_metric_rm(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Removing metrics from endpoint={}".format(
         request_processor.get_id(), args.endpoint))
+    verify_session_version(request_processor)
     request_processor.deserialize(skip_sync=True)
     if not args.variable:
         if request_processor.remove_metric_logging(endpoint=args.endpoint):
@@ -38,7 +67,7 @@ def func_metric_rm(args):
 
 
 def func_metric_add(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Adding metric logging endpoint \'/{}/\'".format(
         request_processor.get_id(), args.endpoint))
     request_processor.deserialize(skip_sync=True)
@@ -104,6 +133,7 @@ def func_model_upload(args):
     else:
         print("Registering model file \'{}\'".format(args.url))
     model.update_weights(weights_filename=args.path, register_uri=args.url, auto_delete_file=False)
+    t.flush(wait_for_uploads=True)
     if args.project:
         # noinspection PyProtectedMember
         model._base_model.update(
@@ -130,11 +160,12 @@ def func_model_ls(args):
 def func_create_service(args):
     request_processor = ModelRequestProcessor(
         force_create=True, name=args.name, project=args.project, tags=args.tags or None)
+    request_processor.serialize()
     print("New Serving Service created: id={}".format(request_processor.get_id()))
 
 
 def func_config_service(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Configure serving service id={}".format(request_processor.get_id()))
     request_processor.deserialize(skip_sync=True)
     if args.base_serving_url:
@@ -162,7 +193,7 @@ def func_list_services(_):
 
 
 def func_model_remove(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Removing Model endpoint={}".format(request_processor.get_id(), args.endpoint))
     request_processor.deserialize(skip_sync=True)
     if request_processor.remove_endpoint(endpoint_url=args.endpoint):
@@ -179,7 +210,7 @@ def func_model_remove(args):
 
 
 def func_canary_add(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Adding canary endpoint \'/{}/\'".format(
         request_processor.get_id(), args.endpoint))
     request_processor.deserialize(skip_sync=True)
@@ -198,7 +229,7 @@ def func_canary_add(args):
 
 
 def func_model_auto_update_add(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Adding Model monitoring endpoint: \'/{}/\'".format(
         request_processor.get_id(), args.endpoint))
 
@@ -207,7 +238,9 @@ def func_model_auto_update_add(args):
             aux_config = Path(args.aux_config[0]).read_text()
         else:
             from clearml.utilities.pyhocon import ConfigFactory
-            aux_config = ConfigFactory.parse_string('\n'.join(args.aux_config)).as_plain_ordered_dict()
+            aux_config = ConfigFactory.parse_string(
+                '\n'.join(args.aux_config).replace("\"", "\\\"").replace("'", "\\\'")
+            ).as_plain_ordered_dict()
     else:
         aux_config = None
 
@@ -238,7 +271,7 @@ def func_model_auto_update_add(args):
 
 
 def func_model_endpoint_add(args):
-    request_processor = ModelRequestProcessor(task_id=args.id)
+    request_processor = safe_ModelRequestProcessor(task_id=args.id)
     print("Serving service Task {}, Adding Model endpoint \'/{}/\'".format(
         request_processor.get_id(), args.endpoint))
     request_processor.deserialize(skip_sync=True)
@@ -248,7 +281,9 @@ def func_model_endpoint_add(args):
             aux_config = Path(args.aux_config[0]).read_text()
         else:
             from clearml.utilities.pyhocon import ConfigFactory
-            aux_config = ConfigFactory.parse_string('\n'.join(args.aux_config)).as_plain_ordered_dict()
+            aux_config = ConfigFactory.parse_string(
+                '\n'.join(args.aux_config).replace("\"", "\\\"").replace("'", "\\\'")
+            ).as_plain_ordered_dict()
     else:
         aux_config = None
 
@@ -283,6 +318,7 @@ def cli():
     print(title)
     parser = ArgumentParser(prog='clearml-serving', description=title)
     parser.add_argument('--debug', action='store_true', help='Print debug messages')
+    parser.add_argument('--yes', action='store_true', help='Always answer YES on interactive inputs')
     parser.add_argument(
         '--id', type=str,
         help='Control plane Task ID to configure '
@@ -447,34 +483,44 @@ def cli():
              '- this should hold for all the models'
     )
     parser_model_monitor.add_argument(
-        '--input-size', type=int, nargs='+',
-        help='Optional: Specify the model matrix input size [Rows x Columns X Channels etc ...]'
+        '--input-size', nargs='+', type=json.loads,
+        help='Optional: Specify the model matrix input size [Rows x Columns X Channels etc ...] '
+             'if multiple inputs are required specify using json notation e.g.: '
+             '\"[dim0, dim1, dim2, ...]\" \"[dim0, dim1, dim2, ...]\"'
     )
     parser_model_monitor.add_argument(
-        '--input-type', type=str,
-        help='Optional: Specify the model matrix input type, examples: uint8, float32, int16, float16 etc.'
+        '--input-type', nargs='+',
+        help='Optional: Specify the model matrix input type, examples: uint8, float32, int16, float16 etc. '
+             'if multiple inputs are required pass multiple values: float32, float32,'
     )
     parser_model_monitor.add_argument(
-        '--input-name', type=str,
-        help='Optional: Specify the model layer pushing input into, examples: layer_0'
+        '--input-name', nargs='+',
+        help='Optional: Specify the model layer pushing input into, examples: layer_0 '
+             'if multiple inputs are required pass multiple values: layer_0, layer_1,'
     )
     parser_model_monitor.add_argument(
-        '--output-size', type=int, nargs='+',
-        help='Optional: Specify the model matrix output size [Rows x Columns X Channels etc ...]'
+        '--output-size', nargs='+', type=json.loads,
+        help='Optional: Specify the model matrix output size [Rows x Columns X Channels etc ...] '
+             'if multiple outputs are required specify using json notation e.g.: '
+             '\"[dim0, dim1, dim2, ...]\" \"[dim0, dim1, dim2, ...]\"'
     )
     parser_model_monitor.add_argument(
-        '--output_type', type=str,
-        help='Optional: Specify the model matrix output type, examples: uint8, float32, int16, float16 etc.'
+        '--output-type', nargs='+',
+        help='Optional: Specify the model matrix output type, examples: uint8, float32, int16, float16 etc. '
+             'if multiple outputs are required pass multiple values: float32, float32,'
     )
     parser_model_monitor.add_argument(
-        '--output-name', type=str,
-        help='Optional: Specify the model layer pulling results from, examples: layer_99'
+        '--output-name', nargs='+',
+        help='Optional: Specify the model layer pulling results from, examples: layer_99 '
+             'if multiple outputs are required pass multiple values: layer_98, layer_99,'
     )
     parser_model_monitor.add_argument(
         '--aux-config', nargs='+',
         help='Specify additional engine specific auxiliary configuration in the form of key=value. '
-             'Example: platform=onnxruntime_onnx response_cache.enable=true max_batch_size=8 '
-             'Notice: you can also pass full configuration file (e.g. Triton "config.pbtxt")'
+             'Examples: platform=\\"onnxruntime_onnx\\" response_cache.enable=true max_batch_size=8 '
+             'input.0.format=FORMAT_NCHW output.0.format=FORMAT_NCHW '
+             'Remarks: (1) string must be quoted (e.g. key=\\"a_string\\") '
+             '(2) instead of key/value pairs, you can also pass a full configuration file (e.g. "./config.pbtxt")'
     )
     parser_model_monitor.set_defaults(func=func_model_auto_update_add)
 
@@ -496,34 +542,44 @@ def cli():
         help='Specify Pre/Post processing code to be used with the model (point to local file / folder)'
     )
     parser_model_add.add_argument(
-        '--input-size', type=int, nargs='+',
-        help='Optional: Specify the model matrix input size [Rows x Columns X Channels etc ...]'
+        '--input-size', nargs='+', type=json.loads,
+        help='Optional: Specify the model matrix input size [Rows x Columns X Channels etc ...] '
+             'if multiple inputs are required specify using json notation e.g.: '
+             '\"[dim0, dim1, dim2, ...]\" \"[dim0, dim1, dim2, ...]\"'
     )
     parser_model_add.add_argument(
-        '--input-type', type=str,
-        help='Optional: Specify the model matrix input type, examples: uint8, float32, int16, float16 etc.'
+        '--input-type', nargs='+',
+        help='Optional: Specify the model matrix input type, examples: uint8, float32, int16, float16 etc. '
+             'if multiple inputs are required pass multiple values: float32, float32,'
     )
     parser_model_add.add_argument(
-        '--input-name', type=str,
-        help='Optional: Specify the model layer pushing input into, examples: layer_0'
+        '--input-name', nargs='+',
+        help='Optional: Specify the model layer pushing input into, examples: layer_0 '
+             'if multiple inputs are required pass multiple values: layer_0, layer_1,'
     )
     parser_model_add.add_argument(
-        '--output-size', type=int, nargs='+',
-        help='Optional: Specify the model matrix output size [Rows x Columns X Channels etc ...]'
+        '--output-size', nargs='+', type=json.loads,
+        help='Optional: Specify the model matrix output size [Rows x Columns X Channels etc ...] '
+             'if multiple outputs are required specify using json notation e.g.: '
+             '\"[dim0, dim1, dim2, ...]\" \"[dim0, dim1, dim2, ...]\"'
     )
     parser_model_add.add_argument(
-        '--output-type', type=str,
-        help='Specify the model matrix output type, examples: uint8, float32, int16, float16 etc.'
+        '--output-type', nargs='+',
+        help='Optional: Specify the model matrix output type, examples: uint8, float32, int16, float16 etc. '
+             'if multiple outputs are required pass multiple values: float32, float32,'
     )
     parser_model_add.add_argument(
-        '--output-name', type=str,
-        help='Optional: Specify the model layer pulling results from, examples: layer_99'
+        '--output-name', nargs='+',
+        help='Optional: Specify the model layer pulling results from, examples: layer_99 '
+             'if multiple outputs are required pass multiple values: layer_98, layer_99,'
     )
     parser_model_add.add_argument(
-        '--aux-config', type=int, nargs='+',
+        '--aux-config', nargs='+',
         help='Specify additional engine specific auxiliary configuration in the form of key=value. '
-             'Example: platform=onnxruntime_onnx response_cache.enable=true max_batch_size=8 '
-             'Notice: you can also pass full configuration file (e.g. Triton "config.pbtxt")'
+             'Examples: platform=\\"onnxruntime_onnx\\" response_cache.enable=true max_batch_size=8 '
+             'input.0.format=FORMAT_NCHW output.0.format=FORMAT_NCHW '
+             'Remarks: (1) string must be quoted (e.g. key=\\"a_string\\") '
+             '(2) instead of key/value pairs, you can also pass a full configuration file (e.g. "./config.pbtxt")'
     )
     parser_model_add.add_argument(
         '--name', type=str,
@@ -540,8 +596,9 @@ def cli():
     parser_model_add.set_defaults(func=func_model_endpoint_add)
 
     args = parser.parse_args()
-    global verbosity
+    global verbosity, answer_yes
     verbosity = args.debug
+    answer_yes = args.yes
 
     if args.command:
         if args.command not in ("create", "list") and not args.id:

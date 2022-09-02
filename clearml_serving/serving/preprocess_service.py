@@ -247,12 +247,14 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         np.int64: 'int64_contents',
         np.uint64: 'uint64_contents',
         np.int: 'int_contents',
+        np.int32: 'int_contents',
         np.uint: 'uint_contents',
         np.bool: 'bool_contents',
         np.float32: 'fp32_contents',
         np.float64: 'fp64_contents',
     }
     _default_grpc_address = "127.0.0.1:8001"
+    _default_grpc_compression = False
     _ext_grpc = None
     _ext_np_to_triton_dtype = None
     _ext_service_pb2 = None
@@ -287,6 +289,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         Detect gRPC server and send the request to it
 
         :param data: object as recieved from the preprocessing function
+            If multiple inputs are needed, data is a list of numpy array
         :param state: Use state dict to store data passed to the post-processing function call.
             Usage example:
             >>> def preprocess(..., state):
@@ -315,51 +318,76 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         except Exception as ex:
             raise ValueError("External Triton gRPC server misconfigured [{}]: {}".format(triton_server_address, ex))
 
+        use_compression = self._server_config.get("triton_grpc_compression", self._default_grpc_compression)
+
         # Generate the request
         request = self._ext_service_pb2.ModelInferRequest()
         request.model_name = "{}/{}".format(self.model_endpoint.serving_url, self.model_endpoint.version).strip("/")
         # we do not use the Triton model versions, we just assume a single version per endpoint
         request.model_version = "1"
 
-        # take the input data
-        input_data = np.array(data, dtype=self.model_endpoint.input_type)
+        # make sure that if we have only one input we maintain backwards compatibility
+        list_data = [data] if len(self.model_endpoint.input_name) == 1 else data
 
         # Populate the inputs in inference request
-        input0 = request.InferInputTensor()
-        input0.name = self.model_endpoint.input_name
-        input_dtype = np.dtype(self.model_endpoint.input_type).type
-        input0.datatype = self._ext_np_to_triton_dtype(input_dtype)
-        input0.shape.extend(self.model_endpoint.input_size)
+        for i_data, m_name, m_type, m_size in zip(
+                list_data, self.model_endpoint.input_name,
+                self.model_endpoint.input_type, self.model_endpoint.input_size
+        ):
+            # take the input data
+            input_data = np.array(i_data, dtype=m_type)
 
-        # to be inferred
-        input_func = self._content_lookup.get(input_dtype)
-        if not input_func:
-            raise ValueError("Input type nt supported {}".format(input_dtype))
-        input_func = getattr(input0.contents, input_func)
-        input_func[:] = input_data.flatten()
+            input0 = request.InferInputTensor()
+            input0.name = m_name
+            input_dtype = np.dtype(m_type).type
+            input0.datatype = self._ext_np_to_triton_dtype(input_dtype)
+            input0.shape.extend(input_data.shape)
 
-        # push into request
-        request.inputs.extend([input0])
+            # to be inferred
+            input_func = self._content_lookup.get(input_dtype)
+            if not input_func:
+                raise ValueError("Input type nt supported {}".format(input_dtype))
+            input_func = getattr(input0.contents, input_func)
+            input_func[:] = input_data.flatten()
+
+            # push into request
+            request.inputs.extend([input0])
 
         # Populate the outputs in the inference request
-        output0 = request.InferRequestedOutputTensor()
-        output0.name = self.model_endpoint.output_name
+        for m_name in self.model_endpoint.output_name:
+            output0 = request.InferRequestedOutputTensor()
+            output0.name = m_name
+            request.outputs.extend([output0])
 
-        request.outputs.extend([output0])
-        response = grpc_stub.ModelInfer(
-            request,
-            compression=self._ext_grpc.Compression.Gzip,
-            timeout=self._timeout
-        )
+        # send infer request over gRPC
+        compression = None
+        try:
+            compression = self._ext_grpc.Compression.Gzip if use_compression \
+                else self._ext_grpc.Compression.NoCompression
+            response = grpc_stub.ModelInfer(
+                request,
+                compression=compression,
+                timeout=self._timeout
+            )
+        except Exception:
+            print("Exception calling Triton RPC function: "
+                  "request_inputs={}, ".format([(r.name, r.shape, r.datatype) for r in (request.inputs or [])]) +
+                  f"triton_address={triton_server_address}, compression={compression}, timeout={self._timeout}")
+            raise
 
+        # process result
         output_results = []
         index = 0
-        for output in response.outputs:
+        for i, output in enumerate(response.outputs):
             shape = []
             for value in output.shape:
                 shape.append(value)
             output_results.append(
-                np.frombuffer(response.raw_output_contents[index], dtype=self.model_endpoint.output_type))
+                np.frombuffer(
+                    response.raw_output_contents[index],
+                    dtype=self.model_endpoint.output_type[min(i, len(self.model_endpoint.output_type)-1)]
+                )
+            )
             output_results[-1] = np.resize(output_results[-1], shape)
             index += 1
 

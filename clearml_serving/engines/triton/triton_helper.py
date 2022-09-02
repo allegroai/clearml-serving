@@ -110,6 +110,9 @@ class TritonHelper(object):
 
         for url, endpoint in active_endpoints.items():
 
+            # Triton model folder structure reference:
+            # https://github.com/triton-inference-server/server/blob/r22.07/docs/model_repository.md#model-repository
+
             # skip if there is no change
             if url in self._current_endpoints and self._current_endpoints.get(url) == endpoint:
                 continue
@@ -138,7 +141,8 @@ class TritonHelper(object):
                 local_path = model.get_local_copy()
             except Exception:
                 local_path = None
-            if not local_path:
+
+            if not local_path or not model:
                 print("Error retrieving model ID {} []".format(model_id, model.url if model else ''))
                 continue
 
@@ -152,42 +156,34 @@ class TritonHelper(object):
             if verbose:
                 print('Update model v{} in {}'.format(version, model_folder))
 
+            framework = str(model.framework).lower()
+
             # if this is a folder copy every and delete the temp folder
-            if local_path.is_dir() and model and (
-                    str(model.framework).lower().startswith("tensorflow") or
-                    str(model.framework).lower().startswith("keras")
-            ):
+            if local_path.is_dir() and model and ("tensorflow" in framework or "keras" in framework):
                 # we assume we have a `tensorflow.savedmodel` folder
                 model_folder /= 'model.savedmodel'
-                model_folder.mkdir(parents=True, exist_ok=True)
-                # rename to old
-                old_folder = None
-                if model_folder.exists():
-                    old_folder = model_folder.parent / '.old.{}'.format(model_folder.name)
-                    model_folder.replace(old_folder)
-                if verbose:
-                    print('copy model into {}'.format(model_folder))
-                shutil.copytree(
-                    local_path.as_posix(), model_folder.as_posix(), symlinks=False,
-                )
-                if old_folder:
-                    shutil.rmtree(path=old_folder.as_posix())
-                # delete temp folder
-                shutil.rmtree(local_path.as_posix())
-            else:
+                self._extract_folder(local_path, model_folder, verbose, remove_existing=True)
+            elif "torch" in framework and local_path.is_file():
                 # single file should be moved
-                if model and str(model.framework).lower().startswith("pytorch"):
-                    target_path = model_folder / "model.pt"
-                else:
-                    target_path = model_folder / local_path.name
-
-                old_file = None
-                if target_path.exists():
-                    old_file = target_path.parent / '.old.{}'.format(target_path.name)
-                    target_path.replace(old_file)
-                shutil.move(local_path.as_posix(), target_path.as_posix())
-                if old_file:
-                    old_file.unlink()
+                self._extract_single_file(local_path, model_folder / "model.pt", verbose)
+            elif "onnx" in framework and local_path.is_dir():
+                # just unzip both model.bin & model.xml into the model folder
+                self._extract_folder(local_path, model_folder, verbose)
+            elif ("tensorflow" in framework or "keras" in framework) and local_path.is_file():
+                # just rename the single file to "model.graphdef"
+                self._extract_single_file(local_path, model_folder / "model.graphdef", verbose)
+            elif "tensorrt" in framework and local_path.is_file():
+                # just rename the single file to "model.plan"
+                self._extract_single_file(local_path, model_folder / "model.plan", verbose)
+            elif local_path.is_file():
+                # generic model will be stored as 'model.bin'
+                self._extract_single_file(local_path, model_folder / "model.bin", verbose)
+            elif local_path.is_dir():
+                # generic model will be stored into the model folder
+                self._extract_folder(local_path, model_folder, verbose)
+            else:
+                print("Model type could not be inferred skipping", model.id, model.framework, model.name)
+                continue
 
         # todo: trigger triton model reloading (instead of relaying on current poll mechanism)
         # based on the model endpoint changes
@@ -196,6 +192,36 @@ class TritonHelper(object):
         self._current_endpoints = active_endpoints
 
         return True
+
+    @staticmethod
+    def _extract_single_file(local_path, target_path, verbose):
+        old_file = None
+        if target_path.exists():
+            old_file = target_path.parent / '.old.{}'.format(target_path.name)
+            target_path.replace(old_file)
+        if verbose:
+            print('copy model into {}'.format(target_path))
+        shutil.move(local_path.as_posix(), target_path.as_posix())
+        if old_file:
+            old_file.unlink()
+
+    @staticmethod
+    def _extract_folder(local_path, model_folder, verbose, remove_existing=False):
+        model_folder.mkdir(parents=True, exist_ok=True)
+        # rename to old
+        old_folder = None
+        if remove_existing and model_folder.exists():
+            old_folder = model_folder.parent / '.old.{}'.format(model_folder.name)
+            model_folder.replace(old_folder)
+        if verbose:
+            print('copy model into {}'.format(model_folder))
+        shutil.copytree(
+            local_path.as_posix(), model_folder.as_posix(), symlinks=False, dirs_exist_ok=True
+        )
+        if old_folder:
+            shutil.rmtree(path=old_folder.as_posix())
+        # delete temp folder
+        shutil.rmtree(local_path.as_posix())
 
     def maintenance_daemon(
             self,
@@ -313,36 +339,34 @@ class TritonHelper(object):
         # replace ": [{" with ": [{" (currently not needed)
         # pattern = re.compile(r"(?P<key>\w+)(?P<space>\s+)(?P<bracket>(\[)|({))")
 
-        if endpoint.input_size:
-            config_dict.put("input.0.dims", endpoint.input_size)
+        for i, s in enumerate(endpoint.input_size or []):
+            config_dict.put("input.{}.dims".format(i), s)
 
-        if endpoint.output_size:
-            config_dict.put("output.0.dims", endpoint.output_size)
+        for i, s in enumerate(endpoint.output_size or []):
+            config_dict.put("output.{}.dims".format(i), s)
 
-        input_type = None
-        if endpoint.input_type:
-            input_type = "TYPE_" + cls.np_to_triton_dtype(np.dtype(endpoint.input_type))
-            config_dict.put("input.0.data_type", input_type)
+        for i, s in enumerate(endpoint.input_type or []):
+            input_type = "TYPE_" + cls.np_to_triton_dtype(np.dtype(s))
+            config_dict.put("input.{}.data_type".format(i), input_type)
 
-        output_type = None
-        if endpoint.output_type:
-            output_type = "TYPE_" + cls.np_to_triton_dtype(np.dtype(endpoint.output_type))
-            config_dict.put("output.0.data_type", output_type)
+        for i, s in enumerate(endpoint.output_type or []):
+            output_type = "TYPE_" + cls.np_to_triton_dtype(np.dtype(s))
+            config_dict.put("output.{}.data_type".format(i), output_type)
 
-        if endpoint.input_name:
-            config_dict.put("input.0.name", endpoint.input_name)
+        for i, s in enumerate(endpoint.input_name or []):
+            config_dict.put("input.{}.name".format(i), "\"{}\"".format(s))
 
-        if endpoint.output_name:
-            config_dict.put("output.0.name", endpoint.output_name)
+        for i, s in enumerate(endpoint.output_name or []):
+            config_dict.put("output.{}.name".format(i), "\"{}\"".format(s))
 
         if platform and not config_dict.get("platform", None) and not config_dict.get("backend", None):
             platform = str(platform).lower()
             if platform.startswith("tensorflow") or platform.startswith("keras"):
-                config_dict["platform"] = "tensorflow_savedmodel"
+                config_dict["platform"] = "\"tensorflow_savedmodel\""
             elif platform.startswith("pytorch") or platform.startswith("caffe"):
-                config_dict["backend"] = "pytorch"
+                config_dict["backend"] = "\"pytorch\""
             elif platform.startswith("onnx"):
-                config_dict["platform"] = "onnxruntime_onnx"
+                config_dict["platform"] = "\"onnxruntime_onnx\""
 
         # convert to lists anything that we can:
         if config_dict:
@@ -350,13 +374,11 @@ class TritonHelper(object):
             # Convert HOCON standard to predefined message format
             config_pbtxt = "\n" + HOCONConverter.to_hocon(config_dict). \
                 replace("=", ":").replace(" : ", ": ")
+
             # conform types (remove string quotes)
-            if input_type:
-                config_pbtxt = config_pbtxt.replace(f"\"{input_type}\"", f"{input_type}")
-            if output_type:
-                config_pbtxt = config_pbtxt.replace(f"\"{output_type}\"", f"{output_type}")
-            # conform types (remove string quotes)
-            config_pbtxt = config_pbtxt.replace("\"KIND_CPU\"", "KIND_CPU").replace("\"KIND_GPU\"", "KIND_GPU")
+            config_pbtxt = config_pbtxt.replace("\\\"", "<DQUOTE>").\
+                replace("\\\'", "<QUOTE>").replace("\"", "").replace("\'", "").\
+                replace("<DQUOTE>", "\"").replace("<QUOTE>", "\'")
         else:
             config_pbtxt = ""
 
