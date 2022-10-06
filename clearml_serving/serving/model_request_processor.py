@@ -124,7 +124,7 @@ class ModelRequestProcessor(object):
         self._serving_base_url = None
         self._metric_log_freq = None
 
-    def process_request(self, base_url: str, version: str, request_body: dict) -> dict:
+    def process_request(self, base_url: str, version: str, request_body: Union[dict, bytes]) -> dict:
         """
         Process request coming in,
         Raise Value error if url does not match existing endpoints
@@ -1133,7 +1133,7 @@ class ModelRequestProcessor(object):
         # update preprocessing classes
         BasePreprocessRequest.set_server_config(self._configuration)
 
-    def _process_request(self, processor: BasePreprocessRequest, url: str, body: dict) -> dict:
+    def _process_request(self, processor: BasePreprocessRequest, url: str, body: Union[bytes, dict]) -> dict:
         # collect statistics for this request
         stats_collect_fn = None
         collect_stats = False
