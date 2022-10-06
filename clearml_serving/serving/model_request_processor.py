@@ -9,6 +9,7 @@ from typing import Optional, Union, Dict, List
 import itertools
 import threading
 from multiprocessing import Lock
+from numpy import isin
 from numpy.random import choice
 
 from clearml import Task, Model
@@ -1167,7 +1168,7 @@ class ModelRequestProcessor(object):
             if metric_endpoint:
                 metric_keys = set(metric_endpoint.metrics.keys())
                 # collect inputs
-                if body:
+                if body and isinstance(body, dict):
                     keys = set(body.keys()) & metric_keys
                     stats.update({k: body[k] for k in keys})
                 # collect outputs
