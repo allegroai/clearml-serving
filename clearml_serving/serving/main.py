@@ -7,10 +7,9 @@ from fastapi.routing import APIRoute
 
 from typing import Optional, Dict, Any, Callable, Union
 
-from clearml import Task
 from clearml_serving.version import __version__
+from clearml_serving.serving.init import setup_task
 from clearml_serving.serving.model_request_processor import ModelRequestProcessor
-from clearml_serving.serving.preprocess_service import BasePreprocessRequest
 
 
 class GzipRequest(Request):
@@ -35,31 +34,20 @@ class GzipRoute(APIRoute):
 
 
 # process Lock, so that we can have only a single process doing the model reloading at a time
-singleton_sync_lock = Lock()
+singleton_sync_lock = None  # Lock()
+# shared Model processor object
+processor = None  # type: Optional[ModelRequestProcessor]
 
-serving_service_task_id = os.environ.get("CLEARML_SERVING_TASK_ID", None)
+# create clearml Task and load models
+serving_service_task_id = setup_task()
+# polling frequency
 model_sync_frequency_secs = 5
 try:
     model_sync_frequency_secs = float(os.environ.get("CLEARML_SERVING_POLL_FREQ", model_sync_frequency_secs))
 except (ValueError, TypeError):
     pass
 
-# get the serving controller task
-# noinspection PyProtectedMember
-serving_task = ModelRequestProcessor._get_control_plane_task(task_id=serving_service_task_id)
-# set to running (because we are here)
-if serving_task.status != "in_progress":
-    serving_task.started(force=True)
-# create a new serving instance (for visibility and monitoring)
-instance_task = Task.init(
-    project_name=serving_task.get_project_name(),
-    task_name="{} - serve instance".format(serving_task.name),
-    task_type="inference",
-)
-instance_task.set_system_tags(["service"])
-processor = None  # type: Optional[ModelRequestProcessor]
-# preload modules into memory before forking
-BasePreprocessRequest.load_modules()
+
 # start FastAPI app
 app = FastAPI(title="ClearML Serving Service", version=__version__, description="ClearML Service Service router")
 
@@ -67,12 +55,18 @@ app = FastAPI(title="ClearML Serving Service", version=__version__, description=
 @app.on_event("startup")
 async def startup_event():
     global processor
-    print("Starting up ModelRequestProcessor [pid={}] [service_id={}]".format(os.getpid(), serving_service_task_id))
-    processor = ModelRequestProcessor(
-        task_id=serving_service_task_id, update_lock_guard=singleton_sync_lock,
-    )
-    print("ModelRequestProcessor [id={}] loaded".format(processor.get_id()))
-    processor.launch(poll_frequency_sec=model_sync_frequency_secs*60)
+
+    if processor:
+        print("ModelRequestProcessor already initialized [pid={}] [service_id={}]".format(
+            os.getpid(), serving_service_task_id))
+    else:
+        print("Starting up ModelRequestProcessor [pid={}] [service_id={}]".format(
+            os.getpid(), serving_service_task_id))
+        processor = ModelRequestProcessor(
+            task_id=serving_service_task_id, update_lock_guard=singleton_sync_lock,
+        )
+        print("ModelRequestProcessor [id={}] loaded".format(processor.get_id()))
+        processor.launch(poll_frequency_sec=model_sync_frequency_secs*60)
 
 
 router = APIRouter(
@@ -89,13 +83,15 @@ router = APIRouter(
 @router.post("/{model_id}")
 async def serve_model(model_id: str, version: Optional[str] = None, request: Union[bytes, Dict[Any, Any]] = None):
     try:
-        return_value = processor.process_request(
+        return_value = await processor.process_request(
             base_url=model_id,
             version=version,
             request_body=request
         )
-    except Exception as ex:
+    except ValueError as ex:
         raise HTTPException(status_code=404, detail="Error processing request: {}".format(ex))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail="Error processing request: {}".format(ex))
     return return_value
 
 

@@ -1,6 +1,7 @@
 clearml >= 1.3.1
 clearml-serving
-tritonclient[grpc]>=2.22.3,<2.23
+tritonclient[grpc]>=2.25,<2.26
+starlette
 grpcio
 Pillow>=9.0.1,<10
 pathlib2

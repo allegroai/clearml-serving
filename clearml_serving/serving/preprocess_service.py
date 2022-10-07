@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Optional, Any, Callable, List
 
@@ -18,6 +19,9 @@ class BasePreprocessRequest(object):
     _default_serving_base_url = "http://127.0.0.1:8080/serve/"
     _server_config = {}  # externally configured by the serving inference service
     _timeout = None  # timeout in seconds for the entire request, set in __init__
+    is_preprocess_async = False
+    is_process_async = False
+    is_postprocess_async = False
 
     def __init__(
             self,
@@ -259,6 +263,9 @@ class TritonPreprocessRequest(BasePreprocessRequest):
     _ext_np_to_triton_dtype = None
     _ext_service_pb2 = None
     _ext_service_pb2_grpc = None
+    is_preprocess_async = False
+    is_process_async = True
+    is_postprocess_async = False
 
     def __init__(self, model_endpoint: ModelEndpoint, task: Task = None):
         super(TritonPreprocessRequest, self).__init__(
@@ -266,7 +273,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
 
         # load Triton Module
         if self._ext_grpc is None:
-            import grpc  # noqa
+            from tritonclient.grpc import grpc  # noqa
             self._ext_grpc = grpc
 
         if self._ext_np_to_triton_dtype is None:
@@ -274,11 +281,13 @@ class TritonPreprocessRequest(BasePreprocessRequest):
             self._ext_np_to_triton_dtype = np_to_triton_dtype
 
         if self._ext_service_pb2 is None:
-            from tritonclient.grpc import service_pb2, service_pb2_grpc  # noqa
+            from tritonclient.grpc.aio import service_pb2, service_pb2_grpc  # noqa
             self._ext_service_pb2 = service_pb2
             self._ext_service_pb2_grpc = service_pb2_grpc
 
-    def process(
+        self._grpc_stub = {}
+
+    async def process(
             self,
             data: Any,
             state: dict,
@@ -312,11 +321,17 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         triton_server_address = self._server_config.get("triton_grpc_server") or self._default_grpc_address
         if not triton_server_address:
             raise ValueError("External Triton gRPC server is not configured!")
-        try:
-            channel = self._ext_grpc.insecure_channel(triton_server_address)
-            grpc_stub = self._ext_service_pb2_grpc.GRPCInferenceServiceStub(channel)
-        except Exception as ex:
-            raise ValueError("External Triton gRPC server misconfigured [{}]: {}".format(triton_server_address, ex))
+
+        tid = threading.get_ident()
+        if self._grpc_stub.get(tid):
+            grpc_stub = self._grpc_stub.get(tid)
+        else:
+            try:
+                channel = self._ext_grpc.aio.insecure_channel(triton_server_address)
+                grpc_stub = self._ext_service_pb2_grpc.GRPCInferenceServiceStub(channel)
+                self._grpc_stub[tid] = grpc_stub
+            except Exception as ex:
+                raise ValueError("External Triton gRPC server misconfigured [{}]: {}".format(triton_server_address, ex))
 
         use_compression = self._server_config.get("triton_grpc_compression", self._default_grpc_compression)
 
@@ -364,15 +379,11 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         try:
             compression = self._ext_grpc.Compression.Gzip if use_compression \
                 else self._ext_grpc.Compression.NoCompression
-            response = grpc_stub.ModelInfer(
-                request,
-                compression=compression,
-                timeout=self._timeout
-            )
-        except Exception:
+            response = await grpc_stub.ModelInfer(request, compression=compression, timeout=self._timeout)
+        except Exception as ex:
             print("Exception calling Triton RPC function: "
                   "request_inputs={}, ".format([(r.name, r.shape, r.datatype) for r in (request.inputs or [])]) +
-                  f"triton_address={triton_server_address}, compression={compression}, timeout={self._timeout}")
+                  f"triton_address={triton_server_address}, compression={compression}, timeout={self._timeout}:\n{ex}")
             raise
 
         # process result
@@ -463,4 +474,84 @@ class CustomPreprocessRequest(BasePreprocessRequest):
         """
         if self._preprocess is not None and hasattr(self._preprocess, 'process'):
             return self._preprocess.process(data, state, collect_custom_statistics_fn)
+        return None
+
+
+@BasePreprocessRequest.register_engine("custom_async")
+class CustomAsyncPreprocessRequest(BasePreprocessRequest):
+    is_preprocess_async = True
+    is_process_async = True
+    is_postprocess_async = True
+
+    def __init__(self, model_endpoint: ModelEndpoint, task: Task = None):
+        super(CustomAsyncPreprocessRequest, self).__init__(
+            model_endpoint=model_endpoint, task=task)
+
+    async def preprocess(
+            self,
+            request: dict,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None,
+    ) -> Optional[Any]:
+        """
+        Raise exception to report an error
+        Return value will be passed to serving engine
+
+        :param request: dictionary as recieved from the RestAPI
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
+        :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
+            to the statictics collector servicd
+
+            Usage example:
+            >>> print(request)
+            {"x0": 1, "x1": 2}
+            >>> collect_custom_statistics_fn({"x0": 1, "x1": 2})
+
+        :return: Object to be passed directly to the model inference
+        """
+        if self._preprocess is not None and hasattr(self._preprocess, 'preprocess'):
+            return await self._preprocess.preprocess(request, state, collect_custom_statistics_fn)
+        return request
+
+    async def postprocess(
+            self,
+            data: Any,
+            state: dict,
+            collect_custom_statistics_fn: Callable[[dict], None] = None
+    ) -> Optional[dict]:
+        """
+        Raise exception to report an error
+        Return value will be passed to serving engine
+
+        :param data: object as recieved from the inference model function
+        :param state: Use state dict to store data passed to the post-processing function call.
+            Usage example:
+            >>> def preprocess(..., state):
+                    state['preprocess_aux_data'] = [1,2,3]
+            >>> def postprocess(..., state):
+                    print(state['preprocess_aux_data'])
+        :param collect_custom_statistics_fn: Optional, allows to send a custom set of key/values
+            to the statictics collector servicd
+
+            Usage example:
+            >>> collect_custom_statistics_fn({"y": 1})
+
+        :return: Dictionary passed directly as the returned result of the RestAPI
+        """
+        if self._preprocess is not None and hasattr(self._preprocess, 'postprocess'):
+            return await self._preprocess.postprocess(data, state, collect_custom_statistics_fn)
+        return data
+
+    async def process(self, data: Any, state: dict, collect_custom_statistics_fn: Callable[[dict], None] = None) -> Any:
+        """
+        The actual processing function.
+        We run the process in this context
+        """
+        if self._preprocess is not None and hasattr(self._preprocess, 'process'):
+            return await self._preprocess.process(data, state, collect_custom_statistics_fn)
         return None
