@@ -5,7 +5,7 @@ import gzip
 from fastapi import FastAPI, Request, Response, APIRouter, HTTPException
 from fastapi.routing import APIRoute
 
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, Union
 
 from clearml import Task
 from clearml_serving.version import __version__
@@ -87,7 +87,7 @@ router = APIRouter(
 @router.post("/{model_id}/{version}")
 @router.post("/{model_id}/")
 @router.post("/{model_id}")
-async def serve_model(model_id: str, version: Optional[str] = None, request: Dict[Any, Any] = None):
+async def serve_model(model_id: str, version: Optional[str] = None, request: Union[bytes, Dict[Any, Any]] = None):
     try:
         return_value = processor.process_request(
             base_url=model_id,

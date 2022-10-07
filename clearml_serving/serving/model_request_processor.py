@@ -9,6 +9,7 @@ from typing import Optional, Union, Dict, List
 import itertools
 import threading
 from multiprocessing import Lock
+from numpy import isin
 from numpy.random import choice
 
 from clearml import Task, Model
@@ -123,7 +124,7 @@ class ModelRequestProcessor(object):
         self._serving_base_url = None
         self._metric_log_freq = None
 
-    def process_request(self, base_url: str, version: str, request_body: dict) -> dict:
+    def process_request(self, base_url: str, version: str, request_body: Union[dict, bytes]) -> dict:
         """
         Process request coming in,
         Raise Value error if url does not match existing endpoints
@@ -1132,7 +1133,7 @@ class ModelRequestProcessor(object):
         # update preprocessing classes
         BasePreprocessRequest.set_server_config(self._configuration)
 
-    def _process_request(self, processor: BasePreprocessRequest, url: str, body: dict) -> dict:
+    def _process_request(self, processor: BasePreprocessRequest, url: str, body: Union[bytes, dict]) -> dict:
         # collect statistics for this request
         stats_collect_fn = None
         collect_stats = False
@@ -1167,7 +1168,7 @@ class ModelRequestProcessor(object):
             if metric_endpoint:
                 metric_keys = set(metric_endpoint.metrics.keys())
                 # collect inputs
-                if body:
+                if body and isinstance(body, dict):
                     keys = set(body.keys()) & metric_keys
                     stats.update({k: body[k] for k in keys})
                 # collect outputs
