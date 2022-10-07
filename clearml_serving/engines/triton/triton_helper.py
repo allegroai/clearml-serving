@@ -489,6 +489,9 @@ def main():
         help='<integer> The number of threads used to accelerate copies and other'
              'operations required to manage input and output tensor contents.'
              'Default is 0')
+    parser.add_argument(
+        '--t-log-verbose', type=str,
+        help='<integer> Triton server logging verbosity (default disabled)')
 
     args = parser.parse_args()
 
