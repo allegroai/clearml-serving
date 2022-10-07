@@ -78,6 +78,9 @@ services:
     image: allegroai/clearml-serving-inference:latest
     container_name: clearml-serving-inference
     restart: unless-stopped
+    # optimize perforamnce
+    security_opt:
+      - seccomp:unconfined
     ports:
       - "8080:8080"
     environment:
@@ -105,6 +108,9 @@ services:
     image: allegroai/clearml-serving-triton:latest
     container_name: clearml-serving-triton
     restart: unless-stopped
+    # optimize perforamnce
+    security_opt:
+      - seccomp:unconfined
     # ports:
       # - "8001:8001"
     environment:
@@ -125,6 +131,9 @@ services:
     image: allegroai/clearml-serving-statistics:latest
     container_name: clearml-serving-statistics
     restart: unless-stopped
+    # optimize perforamnce
+    security_opt:
+      - seccomp:unconfined
     # ports:
       # - "9999:9999"
     environment:

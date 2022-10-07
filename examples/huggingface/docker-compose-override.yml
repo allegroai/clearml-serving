@@ -1,0 +1,3 @@
+services:
+  clearml-serving-triton:
+    image: allegroai/clearml-serving-triton:1.2.0-22.07

@@ -13,7 +13,7 @@ SERVING_PORT="${CLEARML_SERVING_PORT:-8080}"
 GUNICORN_NUM_PROCESS="${CLEARML_SERVING_NUM_PROCESS:-4}"
 GUNICORN_SERVING_TIMEOUT="${GUNICORN_SERVING_TIMEOUT:-600}"
 GUNICORN_MAX_REQUESTS="${GUNICORN_MAX_REQUESTS:-0}"
-UVICORN_SERVE_LOOP="${UVICORN_SERVE_LOOP:-asyncio}"
+UVICORN_SERVE_LOOP="${UVICORN_SERVE_LOOP:-uvloop}"
 UVICORN_LOG_LEVEL="${UVICORN_LOG_LEVEL:-warning}"
 
 # set default internal serve endpoint (for request pipelining)
@@ -41,10 +41,18 @@ fi
 
 if [ -z "$CLEARML_USE_GUNICORN" ]
 then
-  echo "Starting Uvicorn server"
-  PYTHONPATH=$(pwd) python3 -m uvicorn \
-      clearml_serving.serving.main:app --log-level $UVICORN_LOG_LEVEL --host 0.0.0.0 --port $SERVING_PORT --loop $UVICORN_SERVE_LOOP \
-      $UVICORN_EXTRA_ARGS
+  if [ -z "$CLEARML_SERVING_NUM_PROCESS" ]
+  then
+    echo "Starting Uvicorn server - single worker"
+    PYTHONPATH=$(pwd) python3 -m uvicorn \
+        clearml_serving.serving.main:app --log-level $UVICORN_LOG_LEVEL --host 0.0.0.0 --port $SERVING_PORT --loop $UVICORN_SERVE_LOOP \
+        $UVICORN_EXTRA_ARGS
+  else
+    echo "Starting Uvicorn server - multi worker"
+    PYTHONPATH=$(pwd) python3 clearml_serving/serving/uvicorn_mp_entrypoint.py \
+        clearml_serving.serving.main:app --log-level $UVICORN_LOG_LEVEL --host 0.0.0.0 --port $SERVING_PORT --loop $UVICORN_SERVE_LOOP \
+        --workers $CLEARML_SERVING_NUM_PROCESS $UVICORN_EXTRA_ARGS
+  fi
 else
   echo "Starting Gunicorn server"
   # start service
