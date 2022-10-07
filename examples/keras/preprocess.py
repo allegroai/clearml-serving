@@ -21,7 +21,8 @@ class Preprocess(object):
             try:
                 image = Image.open(io.BytesIO(body)).convert("RGB")
             except Exception:
-                raise ValueError("Image could not be decoded")
+                # value error would return 404, we want to return 500 so any other exception
+                raise RuntimeError("Image could not be decoded")
 
         if isinstance(body, dict) and "url" in body.keys():
             # image is given as url, and is fetched
