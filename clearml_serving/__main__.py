@@ -4,6 +4,8 @@ import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
+from clearml.model import Framework
+
 from clearml_serving.serving.model_request_processor import ModelRequestProcessor, CanaryEP
 from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint, EndpointMetricLogging
 
@@ -420,7 +422,9 @@ def cli():
         '--project', type=str, required=True,
         help='Specifying the project for the model tp be registered in')
     parser_model_upload.add_argument(
-        '--framework', type=str, choices=("scikit-learn", "xgboost", "lightgbm", "tensorflow", "pytorch"),
+        '--framework', type=str,
+        choices=[p for p in Framework.__dict__.keys()
+                 if not p.startswith("_") and not callable(getattr(Framework, p))]+["custom"],
         help='[Optional] Specify the model framework: "scikit-learn", "xgboost", "lightgbm", "tensorflow", "pytorch"')
     parser_model_upload.add_argument(
         '--publish', action='store_true',
@@ -460,7 +464,7 @@ def cli():
         help='Base Model endpoint (must be unique)')
     parser_model_monitor.add_argument(
         '--engine', type=str, required=True,
-        help='Model endpoint serving engine (triton, sklearn, xgboost, lightgbm)')
+        help='Model endpoint serving engine (triton, sklearn, xgboost, lightgbm, custom, custom_async)')
     parser_model_monitor.add_argument(
         '--max-versions', type=int, default=1,
         help='max versions to store (and create endpoints) for the model. highest number is the latest version')
