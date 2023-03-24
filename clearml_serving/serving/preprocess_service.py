@@ -252,7 +252,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         np.uint64: 'uint64_contents',
         np.int32: 'int_contents',
         np.uint: 'uint_contents',
-        np.bool: 'bool_contents',
+        bool: 'bool_contents',
         np.float32: 'fp32_contents',
         np.float64: 'fp64_contents',
     }
