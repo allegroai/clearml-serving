@@ -1,5 +1,7 @@
-FROM python:3.9-bullseye
+# works with python 3.8 as well.
+ARG PYTHON_VERSION=3.9
 
+FROM python:${PYTHON_VERSION}-bullseye
 
 ENV LC_ALL=C.UTF-8
 
