@@ -263,6 +263,7 @@ def func_model_auto_update_add(args):
             output_type=args.output_type,
             output_name=args.output_name,
             auxiliary_cfg=aux_config,
+            triton_config_file=args.triton_config_file
         ),
         preprocess_code=args.preprocess
     ):
@@ -302,6 +303,7 @@ def func_model_endpoint_add(args):
             output_type=args.output_type,
             output_name=args.output_name,
             auxiliary_cfg=aux_config,
+            triton_config_file=args.triton_config_file
         ),
         preprocess_code=args.preprocess,
         model_name=args.name,

@@ -5,6 +5,7 @@ import subprocess
 from argparse import ArgumentParser
 from time import time
 from typing import Optional
+import shutil
 
 import numpy as np
 from clearml import Task, Logger, InputModel
@@ -319,7 +320,16 @@ class TritonHelper(object):
                 config[k] = _convert_lists(v)
 
             return config
+        
+        def validate_config_file(config):
+            pass
 
+        if endpoint.triton_config_file: # if passed the config file directly
+            if not validate_config_file(endpoint.triton_config_file):
+                raise AssertionError("Invalid config file")
+            shutil.copyfile(endpoint.triton_config_file, target_pbtxt_file)
+            return True
+        
         final_config_pbtxt = ""
         config_dict = dict()
 
@@ -390,6 +400,8 @@ class TritonHelper(object):
         with open(target_pbtxt_file, "w") as config_file:
             config_file.write(final_config_pbtxt)
 
+        print("final_config_pbtxt", final_config_pbtxt)
+        print("target_pbtxt_file", target_pbtxt_file)
         return True
 
     @staticmethod

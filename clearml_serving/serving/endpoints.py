@@ -59,6 +59,7 @@ class ModelMonitoring(BaseStruct):
     preprocess_artifact = attrib(
         type=str, default=None)  # optional artifact name storing the model preprocessing code
     auxiliary_cfg = attrib(type=dict, default=None)  # Auxiliary configuration (e.g. triton conf), Union[str, dict]
+    triton_config_file = attrib(type=str, default=None) # Triton configuration file path
 
 
 @attrs
@@ -76,6 +77,7 @@ class ModelEndpoint(BaseStruct):
     output_type = attrib(type=list, default=None, validator=_matrix_type_validator, converter=_list_type_convertor)
     output_name = attrib(type=list, default=None, converter=_list_type_convertor)  # optional, output layer names
     auxiliary_cfg = attrib(type=dict, default=None)  # Optional: Auxiliary configuration (e.g. triton conf), [str, dict]
+    triton_config_file = attrib(type=str, default=None) # Triton configuration file path
 
 
 @attrs
