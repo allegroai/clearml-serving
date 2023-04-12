@@ -24,12 +24,18 @@ class Preprocess(object):
         # it will also set the internal model_endpoint to reference the specific model endpoint object being served
         self.model_endpoint = None  # type: clearml_serving.serving.endpoints.ModelEndpoint
 
-    def load(self, local_file_name: str) -> Optional[Any]:  # noqa
+    def load(self, local_file_name: str) -> Any:  # noqa
         """
         Optional: provide loading method for the model
         useful if we need to load a model in a specific way for the prediction engine to work
+
+        Notice! When used with specific engines (i.e. not Custom)
+        The returned object will be passed as is to the inference engine,
+        this means it must not be None, otherwise the endpoint will be ignored!
+
         :param local_file_name: file name / path to read load the model from
-        :return: Object that will be called with .predict() method for inference
+
+        :return: Object that will be called with .predict() method for inference.
         """
         pass
 
