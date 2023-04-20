@@ -16,11 +16,11 @@ The output will be a model created on the project "serving examples", by the nam
 
 2. Create model endpoint: 
 
-`clearml-serving --id <service_id> model add --engine lightgbm --endpoint "test_model_lgbm" --preprocess "examples/lightgbm/preprocess.py" --name "train lightgbm model" --project "serving examples"`
+`clearml-serving --id <service_id> model add --engine lightgbm --endpoint "test_model_lgbm" --preprocess "examples/lightgbm/preprocess.py" --name "train lightgbm model - lgbm_model" --project "serving examples"`
 
 Or auto-update 
 
-`clearml-serving --id <service_id> model auto-update --engine lightgbm --endpoint "test_model_auto" --preprocess "examples/lightgbm/preprocess.py" --name "train lightgbm model" --project "serving examples" --max-versions 2`
+`clearml-serving --id <service_id> model auto-update --engine lightgbm --endpoint "test_model_auto" --preprocess "examples/lightgbm/preprocess.py" --name "train lightgbm model - lgbm_model" --project "serving examples" --max-versions 2`
 
 Or add Canary endpoint
 

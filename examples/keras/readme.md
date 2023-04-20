@@ -17,12 +17,12 @@ Prerequisites, Keras/Tensorflow models require Triton engine support, please use
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint: 
 
- `clearml-serving --id <service_id> model add --engine triton --endpoint "test_model_keras" --preprocess "examples/keras/preprocess.py" --name "train keras model" --project "serving examples" --input-size 1 784 --input-name "dense_input" --input-type float32 --output-size -1 10 --output-name "activation_2" --output-type float32   
+ `clearml-serving --id <service_id> model add --engine triton --endpoint "test_model_keras" --preprocess "examples/keras/preprocess.py" --name "train keras model - serving_model" --project "serving examples" --input-size 1 784 --input-name "dense_input" --input-type float32 --output-size -1 10 --output-name "activation_2" --output-type float32   
 `
 
 Or auto update
 
-`clearml-serving --id <service_id> model auto-update --engine triton --endpoint "test_model_auto" --preprocess "examples/keras/preprocess.py" --name "train keras model" --project "serving examples" --max-versions 2
+`clearml-serving --id <service_id> model auto-update --engine triton --endpoint "test_model_auto" --preprocess "examples/keras/preprocess.py" --name "train keras model - serving_model" --project "serving examples" --max-versions 2
   --input-size 1 784 --input-name "dense_input" --input-type float32   
   --output-size -1 10 --output-name "activation_2" --output-type float32`
 

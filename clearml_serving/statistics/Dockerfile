@@ -1,4 +1,4 @@
-FROM python:3.9-bullseye
+FROM python:3.11-bullseye
 
 
 ENV LC_ALL=C.UTF-8

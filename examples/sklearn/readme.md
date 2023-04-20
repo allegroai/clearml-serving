@@ -14,11 +14,11 @@ The output will be a model created on the project "serving examples", by the nam
 
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint: 
-`clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples"`
+`clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model - sklearn-model" --project "serving examples"`
 
 Or auto update 
 
-`clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples" --max-versions 2`
+`clearml-serving --id <service_id> model auto-update --engine sklearn --endpoint "test_model_sklearn_auto" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model - sklearn-model" --project "serving examples" --max-versions 2`
 
 Or add Canary endpoint
 

@@ -420,7 +420,7 @@ def cli():
         help='Optional: Add tags to the newly created model')
     parser_model_upload.add_argument(
         '--project', type=str, required=True,
-        help='Specifying the project for the model tp be registered in')
+        help='Specifying the project for the model to be registered in')
     parser_model_upload.add_argument(
         '--framework', type=str,
         choices=[p for p in Framework.__dict__.keys()

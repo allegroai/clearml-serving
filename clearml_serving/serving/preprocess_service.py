@@ -16,6 +16,7 @@ from .endpoints import ModelEndpoint
 class BasePreprocessRequest(object):
     __preprocessing_lookup = {}
     __preprocessing_modules = set()
+    _grpc_env_conf_prefix = "CLEARML_GRPC_"
     _default_serving_base_url = "http://127.0.0.1:8080/serve/"
     _server_config = {}  # externally configured by the serving inference service
     _timeout = None  # timeout in seconds for the entire request, set in __init__
@@ -246,13 +247,14 @@ class BasePreprocessRequest(object):
 @BasePreprocessRequest.register_engine("triton", modules=["grpc", "tritonclient"])
 class TritonPreprocessRequest(BasePreprocessRequest):
     _content_lookup = {
+        getattr(np, 'int', int): 'int_contents',
         np.uint8: 'uint_contents',
         np.int8: 'int_contents',
         np.int64: 'int64_contents',
         np.uint64: 'uint64_contents',
         np.int32: 'int_contents',
         np.uint: 'uint_contents',
-        np.bool: 'bool_contents',
+        getattr(np, 'bool', bool): 'bool_contents',
         np.float32: 'fp32_contents',
         np.float64: 'fp64_contents',
     }
@@ -325,8 +327,20 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         if self._grpc_stub.get(tid):
             grpc_stub = self._grpc_stub.get(tid)
         else:
+            channel_opt = []
+            for k, v in os.environ.items():
+                if str(k).startswith(self._grpc_env_conf_prefix):
+                    try:
+                        v = int(v)
+                    except:  # noqa
+                        try:
+                            v = float(v)
+                        except:  # noqa
+                            pass
+                    channel_opt.append(('grpc.{}'.format(k[len(self._grpc_env_conf_prefix):]), v))
+
             try:
-                channel = self._ext_grpc.aio.insecure_channel(triton_server_address)
+                channel = self._ext_grpc.aio.insecure_channel(triton_server_address, options=channel_opt or None)
                 grpc_stub = self._ext_service_pb2_grpc.GRPCInferenceServiceStub(channel)
                 self._grpc_stub[tid] = grpc_stub
             except Exception as ex:

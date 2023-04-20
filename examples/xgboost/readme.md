@@ -15,11 +15,11 @@ The output will be a model created on the project "serving examples", by the nam
 1. Create serving Service: `clearml-serving create --name "serving example"` (write down the service ID)
 2. Create model endpoint: 
 
-3. `clearml-serving --id <service_id> model add --engine xgboost --endpoint "test_model_xgb" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model" --project "serving examples"`
+3. `clearml-serving --id <service_id> model add --engine xgboost --endpoint "test_model_xgb" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model - xgb_model" --project "serving examples"`
 
 Or auto update 
 
-`clearml-serving --id <service_id> model auto-update --engine xgboost --endpoint "test_model_xgb_auto" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model" --project "serving examples" --max-versions 2`
+`clearml-serving --id <service_id> model auto-update --engine xgboost --endpoint "test_model_xgb_auto" --preprocess "examples/xgboost/preprocess.py" --name "train xgboost model - xgb_model" --project "serving examples" --max-versions 2`
 
 Or add Canary endpoint
 
