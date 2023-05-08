@@ -316,7 +316,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         """
         # allow overriding the process method
         if self._preprocess is not None and hasattr(self._preprocess, "process"):
-            return self._preprocess.process(data, state, collect_custom_statistics_fn)
+            return await self._preprocess.process(data, state, collect_custom_statistics_fn)
 
         # Create gRPC stub for communicating with the server
         triton_server_address = self._server_config.get("triton_grpc_server") or self._default_grpc_address
