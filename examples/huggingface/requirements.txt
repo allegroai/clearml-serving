@@ -1,2 +1,1 @@
 clearml-serving
-jupyter
