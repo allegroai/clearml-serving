@@ -359,6 +359,22 @@ class TritonHelper(object):
         for i, s in enumerate(endpoint.output_name or []):
             config_dict.put("output.{}.name".format(i), "\"{}\"".format(s))
 
+        # check if we have platform in the auxiliary config pbtxt
+        if platform and final_config_pbtxt:
+            # noinspection PyBroadException
+            try:
+                final_config_pbtxt_dict = ConfigFactory.parse_string(final_config_pbtxt)
+                # if we found it, null the requested platform and use the auxiliary config pbtxt platform `value`
+                if final_config_pbtxt_dict.get("platform", None):
+                    print(
+                        "WARNING: ignoring auto-detecetd `platform={}` "
+                        "and using auxiliary pbtxt `platform={}`".format(
+                            str(platform).lower(), final_config_pbtxt_dict.get("platform")))
+                    platform = None
+            except Exception:
+                # we failed parsing the auxiliary pbtxt
+                pass
+
         if platform and not config_dict.get("platform", None) and not config_dict.get("backend", None):
             platform = str(platform).lower()
             if platform.startswith("tensorflow") or platform.startswith("keras"):

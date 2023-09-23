@@ -6,15 +6,22 @@ from pathlib import Path
 
 from clearml.model import Framework
 
-from clearml_serving.serving.model_request_processor import ModelRequestProcessor, CanaryEP
 from clearml_serving.serving.endpoints import ModelMonitoring, ModelEndpoint, EndpointMetricLogging
+from clearml_serving.serving.model_request_processor import ModelRequestProcessor, CanaryEP
+from clearml_serving.version import __version__
+
+# noinspection PyBroadException
+try:
+    from clearml.backend_api import Session
+    Session.add_client(__package__.partition(".")[0].replace("_", "-"), __version__)  # noqa
+except Exception:
+    pass
 
 verbosity = False
 answer_yes = False
 
 
 def verify_session_version(request_processor):
-    from clearml_serving.version import __version__
     current_v = float('.'.join(str(__version__).split(".")[:2]))
     stored_v = float('.'.join(str(request_processor.get_version()).split(".")[:2]))
     if stored_v != current_v:
