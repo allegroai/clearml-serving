@@ -240,13 +240,22 @@ class StatisticsController(object):
                 sleep(30)
 
         # we will never leave this loop
-        for message in consumer:
+        while True:
+            # noinspection PyBroadException
+            try:
+                message = next(consumer)
+            except Exception:
+                print("Warning: failed to pull kafka consumer pipe")
+                sleep(5)
+                continue
+
             # noinspection PyBroadException
             try:
                 list_data = json.loads(message.value.decode("utf-8"))
             except Exception:
                 print("Warning: failed to decode kafka stats message")
                 continue
+
             for data in list_data:
                 try:
                     url = data.pop("_url", None)
