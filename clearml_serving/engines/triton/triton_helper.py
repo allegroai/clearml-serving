@@ -422,6 +422,8 @@ class TritonHelper(object):
             return "FP32"
         elif np_dtype == np.float64:
             return "FP64"
+        elif np_dtype == str:
+            return "STRING"
         elif np_dtype == np.object_ or np_dtype.type == np.bytes_:
             return "BYTES"
         return None
