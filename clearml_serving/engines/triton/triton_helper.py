@@ -444,6 +444,36 @@ class TritonHelper(object):
             return "BYTES"
         return None
 
+    @staticmethod
+    def triton_to_np_dtype(dtype):
+        if dtype == "BOOL":
+            return bool
+        elif dtype == "INT8":
+            return np.int8
+        elif dtype == "INT16":
+            return np.int16
+        elif dtype == "INT32":
+            return np.int32
+        elif dtype == "INT64":
+            return np.int64
+        elif dtype == "UINT8":
+            return np.uint8
+        elif dtype == "UINT16":
+            return np.uint16
+        elif dtype == "UINT32":
+            return np.uint32
+        elif dtype == "UINT64":
+            return np.uint64
+        elif dtype == "FP16":
+            return np.float16
+        elif dtype == "FP32":
+            return np.float32
+        elif dtype == "FP64":
+            return np.float64
+        elif dtype == "BYTES":
+            return np.object_
+        return None
+
 
 def main():
     title = 'clearml-serving - Nvidia Triton Engine Controller'
