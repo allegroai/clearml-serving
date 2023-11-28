@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+import traceback
 from pathlib import Path
 from typing import Optional, Any, Callable, List
 
@@ -48,8 +49,8 @@ class BasePreprocessRequest(object):
                 try:
                     self._instantiate_custom_preprocess_cls(task)
                 except Exception as ex:
-                    raise ValueError("Error: Failed loading preprocess code for \'{}\': {}".format(
-                        self.model_endpoint.preprocess_artifact, ex))
+                    raise ValueError("Error: Failed loading preprocess code for \'{}\': {}\n\n{}".format(
+                        self.model_endpoint.preprocess_artifact, ex, traceback.format_exc()))
 
     def _instantiate_custom_preprocess_cls(self, task: Task) -> None:
         path = task.artifacts[self.model_endpoint.preprocess_artifact].get_local_copy(extract_archive=False)

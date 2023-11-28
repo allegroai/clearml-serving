@@ -359,6 +359,22 @@ class TritonHelper(object):
         for i, s in enumerate(endpoint.output_name or []):
             config_dict.put("output.{}.name".format(i), "\"{}\"".format(s))
 
+        # check if we have platform in the auxiliary config pbtxt
+        if platform and final_config_pbtxt:
+            # noinspection PyBroadException
+            try:
+                final_config_pbtxt_dict = ConfigFactory.parse_string(final_config_pbtxt)
+                # if we found it, null the requested platform and use the auxiliary config pbtxt platform `value`
+                if final_config_pbtxt_dict.get("platform", None):
+                    print(
+                        "WARNING: ignoring auto-detecetd `platform={}` "
+                        "and using auxiliary pbtxt `platform={}`".format(
+                            str(platform).lower(), final_config_pbtxt_dict.get("platform")))
+                    platform = None
+            except Exception:
+                # we failed parsing the auxiliary pbtxt
+                pass
+
         if platform and not config_dict.get("platform", None) and not config_dict.get("backend", None):
             platform = str(platform).lower()
             if platform.startswith("tensorflow") or platform.startswith("keras"):
@@ -422,8 +438,40 @@ class TritonHelper(object):
             return "FP32"
         elif np_dtype == np.float64:
             return "FP64"
+        elif np_dtype == str:
+            return "STRING"
         elif np_dtype == np.object_ or np_dtype.type == np.bytes_:
             return "BYTES"
+        return None
+
+    @staticmethod
+    def triton_to_np_dtype(dtype):
+        if dtype == "BOOL":
+            return bool
+        elif dtype == "INT8":
+            return np.int8
+        elif dtype == "INT16":
+            return np.int16
+        elif dtype == "INT32":
+            return np.int32
+        elif dtype == "INT64":
+            return np.int64
+        elif dtype == "UINT8":
+            return np.uint8
+        elif dtype == "UINT16":
+            return np.uint16
+        elif dtype == "UINT32":
+            return np.uint32
+        elif dtype == "UINT64":
+            return np.uint64
+        elif dtype == "FP16":
+            return np.float16
+        elif dtype == "FP32":
+            return np.float32
+        elif dtype == "FP64":
+            return np.float64
+        elif dtype == "BYTES":
+            return np.object_
         return None
 
 

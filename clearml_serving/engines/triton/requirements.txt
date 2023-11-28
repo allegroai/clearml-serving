@@ -3,5 +3,5 @@ clearml-serving
 tritonclient[grpc]>=2.32,<2.33
 starlette
 grpcio
-Pillow>=9.0.1,<10
+Pillow>=10.0.1
 pathlib2
