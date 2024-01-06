@@ -4,3 +4,4 @@ requests>=2.31.0,<2.26
 kafka-python>=2.0.2,<2.1
 prometheus_client>=0.13.1,<0.14
 lz4>=4.0.0,<5
+pillow>=10.0.1 # not directly required, pinned by Snyk to avoid a vulnerability
