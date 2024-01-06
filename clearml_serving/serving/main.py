@@ -89,7 +89,7 @@ async def serve_model(model_id: str, version: Optional[str] = None, request: Uni
             request_body=request
         )
     except ValueError as ex:
-        raise HTTPException(status_code=404, detail="Error processing request: {}".format(ex))
+        raise HTTPException(status_code=422, detail="Error processing request: {}".format(ex))
     except Exception as ex:
         raise HTTPException(status_code=500, detail="Error processing request: {}".format(ex))
     return return_value
