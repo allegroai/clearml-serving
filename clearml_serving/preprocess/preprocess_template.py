@@ -26,8 +26,10 @@ class Preprocess(object):
 
     def load(self, local_file_name: str) -> Any:  # noqa
         """
-        Optional: provide loading method for the model
+        OPTIONAL: provide loading method for the model
         useful if we need to load a model in a specific way for the prediction engine to work
+
+        REMOVE FUNCTION IF NOT USED
 
         Notice! When used with specific engines (i.e. not Custom)
         The returned object will be passed as is to the inference engine,
@@ -108,8 +110,10 @@ class Preprocess(object):
             collect_custom_statistics_fn: Optional[Callable[[dict], None]],
     ) -> Any:  # noqa
         """
-        Optional: do something with the actual data, return any type of object.
+        OPTIONAL: do something with the actual data, return any type of object.
         The returned object will be passed as is to the postprocess function engine
+
+        REMOVE FUNCTION IF NOT USED
 
         :param data: object as recieved from the preprocessing function
         :param state: Use state dict to store data passed to the post-processing function call.
@@ -138,7 +142,7 @@ class Preprocess(object):
             data: Optional[dict] = None
     ) -> Optional[dict]:
         """
-        NOTICE: This method will be replaced in runtime, by the inference service
+        NOTICE! This method will be replaced in runtime, by the inference service
 
         Helper method to send model inference requests to the inference service itself.
         This is designed to help with model ensemble, model pipelines, etc.
