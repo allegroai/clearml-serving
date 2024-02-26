@@ -351,7 +351,12 @@ class TritonPreprocessRequest(BasePreprocessRequest):
 
         # Generate the request
         request = self._ext_service_pb2.ModelInferRequest()
-        request.model_name = "{}/{}".format(self.model_endpoint.serving_url, self.model_endpoint.version).strip("/")
+        if self.model_endpoint.version:
+            request.model_name = "{}_{}".format(
+                self.model_endpoint.serving_url, self.model_endpoint.version).strip("/")
+        else:
+            request.model_name = str(self.model_endpoint.serving_url).strip("/")
+
         # we do not use the Triton model versions, we just assume a single version per endpoint
         request.model_version = "1"
 
