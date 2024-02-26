@@ -835,6 +835,8 @@ class ModelRequestProcessor(object):
         """
         Background thread, syncing model changes into request service.
         """
+        from clearml.backend_api.services import tasks
+
         poll_frequency_sec = float(poll_frequency_sec)
         # force mark started on the main serving service task
         self._task.mark_started(force=True)
@@ -843,6 +845,17 @@ class ModelRequestProcessor(object):
         model_monitor_update = False
         self._update_serving_plot()
         while True:
+            # noinspection PyBroadException
+            try:
+                # make sure we let the serving session know we are alive
+                self._task.send(tasks.PingRequest(self._task.id))
+            except Exception:
+                # noinspection PyBroadException
+                try:
+                    self._report_text("Failed pinging serving session id={}".format(self._task.id))
+                except Exception as ex:
+                    pass
+
             try:
                 # this should be the only place where we call deserialize
                 self._task.reload()
