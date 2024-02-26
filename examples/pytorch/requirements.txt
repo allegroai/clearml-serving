@@ -2,5 +2,4 @@ torchvision
 torch
 clearml
 Pillow
-setuptools<58
 tensorboard
