@@ -37,7 +37,7 @@ Or add Canary endpoint
 3. Make sure you have the `clearml-serving` `docker-compose-triton.yml` (or `docker-compose-triton-gpu.yml`) running, it might take it a minute or two to sync with the new endpoint.
 
 4. Test new endpoint (do notice the first call will trigger the model pulling, so it might take longer, from here on, it's all in memory): \
-  `curl -X POST "http://127.0.0.1:8080/serve/test_model_pytorch" -H "accept: application/json" -H "Content-Type: application/json" -d '{"url": "https://camo.githubusercontent.com/8385ca52c9cba1f6e629eb938ab725ec8c9449f12db81f9a34e18208cd328ce9/687474703a2f2f706574722d6d6172656b2e636f6d2f77702d636f6e74656e742f75706c6f6164732f323031372f30372f6465636f6d707265737365642e6a7067"}'` \
+  `curl -X POST "http://127.0.0.1:8080/serve/test_model_pytorch" -H "accept: application/json" -H "Content-Type: application/json" -d '{"url": "https://raw.githubusercontent.com/allegroai/clearml-serving/main/examples/pytorch/5.jpg"}'` \
   or send a local file to be classified with \
   `curl -X POST "http://127.0.0.1:8080/serve/test_model_pytorch" -H "Content-Type: image/jpeg" --data-binary "@5.jpg"`
 
