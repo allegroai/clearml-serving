@@ -15,7 +15,14 @@ Training a scikit-learn model (see example/sklearn)
 `clearml-serving --id <service_id> model add --engine sklearn --endpoint "test_model_sklearn_b" --preprocess "examples/sklearn/preprocess.py" --name "train sklearn model" --project "serving examples"`
 
 3. Create pipeline model endpoint: 
+
+Threaded version
+
 `clearml-serving --id <service_id> model add --engine custom --endpoint "test_model_pipeline" --preprocess "examples/pipeline/preprocess.py"`
+
+AsyncIO version
+
+`clearml-serving --id <service_id> model add --engine custom_async --endpoint "test_model_pipeline" --preprocess "examples/pipeline/async_preprocess.py"`
 
 4. If you already have the `clearml-serving` docker-compose running, it might take it a minute or two to sync with the new endpoint.
 
