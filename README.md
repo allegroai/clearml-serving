@@ -290,7 +290,8 @@ Grafana model performance example:
 - LightGBM [example](examples/lightgbm/readme.md) - iris dataset
 - PyTorch [example](examples/pytorch/readme.md) - mnist dataset
 - TensorFlow/Keras [example](examples/keras/readme.md) - mnist dataset
-- Model Pipeline [example](examples/pipeline/readme.md) - random data
+- Multi-Model Pipeline [example](examples/pipeline/readme.md) - multiple models
+- Multi-Model ASync Pipeline [example](examples/pipeline/async_preprocess.py) - multiple models
 - Custom Model [example](examples/custom/readme.md) - custom data
 
 ### :pray: Status
