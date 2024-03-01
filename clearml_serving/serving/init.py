@@ -26,8 +26,12 @@ def setup_task(force_threaded_logging=None):
         task_type="inference",  # noqa
     )
     instance_task.set_system_tags(["service"])
+    # make sure we start logging thread/process
+    instance_logger = instance_task.get_logger()  # noqa
+    # this will use the main thread/process
+    session_logger = serving_task.get_logger()
 
     # preload modules into memory before forking
     BasePreprocessRequest.load_modules()
 
-    return serving_service_task_id
+    return serving_service_task_id, session_logger, instance_task.id

@@ -1,5 +1,5 @@
 import os
-from multiprocessing import Lock
+import traceback
 import gzip
 
 from fastapi import FastAPI, Request, Response, APIRouter, HTTPException
@@ -9,7 +9,8 @@ from typing import Optional, Dict, Any, Callable, Union
 
 from clearml_serving.version import __version__
 from clearml_serving.serving.init import setup_task
-from clearml_serving.serving.model_request_processor import ModelRequestProcessor
+from clearml_serving.serving.model_request_processor import ModelRequestProcessor, EndpointNotFoundException, \
+    EndpointBackendEngineException, EndpointModelLoadException, ServingInitializationException
 
 
 class GzipRequest(Request):
@@ -39,7 +40,7 @@ singleton_sync_lock = None  # Lock()
 processor = None  # type: Optional[ModelRequestProcessor]
 
 # create clearml Task and load models
-serving_service_task_id = setup_task()
+serving_service_task_id, session_logger, instance_id = setup_task()
 # polling frequency
 model_sync_frequency_secs = 5
 try:
@@ -88,10 +89,24 @@ async def serve_model(model_id: str, version: Optional[str] = None, request: Uni
             version=version,
             request_body=request
         )
+    except EndpointNotFoundException as ex:
+        raise HTTPException(status_code=404, detail="Error processing request, endpoint was not found: {}".format(ex))
+    except (EndpointModelLoadException, EndpointBackendEngineException) as ex:
+        session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
+            instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
+        raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
+    except ServingInitializationException as ex:
+        session_logger.report_text("[{}] Exception [{}] {} while loading serving inference: {}\n{}".format(
+            instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
+        raise HTTPException(status_code=500, detail="Error [{}] processing request: {}".format(type(ex), ex))
     except ValueError as ex:
-        raise HTTPException(status_code=422, detail="Error processing request: {}".format(ex))
+        session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
+            instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
+        raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
     except Exception as ex:
-        raise HTTPException(status_code=500, detail="Error processing request: {}".format(ex))
+        session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
+            instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
+        raise HTTPException(status_code=500, detail="Error  [{}] processing request: {}".format(type(ex), ex))
     return return_value
 
 
