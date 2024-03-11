@@ -5,7 +5,7 @@
 
 **ClearML Serving - Model deployment made easy**
 
-## **`clearml-serving v1.3` </br> :sparkles: Model Serving (ML/DL) Made Easy :tada:** <br> :fire: NEW version 1.3 :rocket: 20% faster ! 
+## **`clearml-serving v1.3.1` </br> :sparkles: Model Serving (ML/DL) Made Easy :tada:** <br> :fire: NEW version 1.3 :rocket: 20% faster ! 
 
 
 [![GitHub license](https://img.shields.io/github/license/allegroai/clearml-serving.svg)](https://img.shields.io/github/license/allegroai/clearml-serving.svg)
@@ -14,6 +14,7 @@
 [![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/allegroai)](https://artifacthub.io/packages/helm/allegroai/clearml-serving)
 [![Slack Channel](https://img.shields.io/badge/slack-%23clearml--community-blueviolet?logo=slack)](https://joinslack.clear.ml)
 
+`🌟 ClearML is open-source - Leave a star to support the project! 🌟`
 
 </div>
 
