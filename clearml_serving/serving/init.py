@@ -6,6 +6,7 @@ from clearml_serving.serving.preprocess_service import BasePreprocessRequest
 
 def setup_task(force_threaded_logging=None):
     serving_service_task_id = os.environ.get("CLEARML_SERVING_TASK_ID", None)
+    inference_service_task_id = os.environ.get("CLEARML_INFERENCE_TASK_ID", False) # according Task.init() docs
 
     # always use background thread, it requires less memory
     if force_threaded_logging or os.environ.get("CLEARML_BKG_THREAD_REPORT") in ("1", "Y", "y", "true"):
@@ -24,6 +25,7 @@ def setup_task(force_threaded_logging=None):
         project_name=serving_task.get_project_name(),
         task_name="{} - serve instance".format(serving_task.name),
         task_type="inference",  # noqa
+        continue_last_task=inference_service_task_id,
     )
     instance_task.set_system_tags(["service"])
     # make sure we start logging thread/process
