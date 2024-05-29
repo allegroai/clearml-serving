@@ -123,7 +123,7 @@ async def serve_model(model_id: str, version: Optional[str] = None, request: Uni
     except ValueError as ex:
         session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
             instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
-        if "CUDA out of memory. " in str(ex):
+        if "CUDA out of memory. " in str(ex) or "NVML_SUCCESS == r INTERNAL ASSERT FAILED" in str(ex):
             raise CUDAException(exception=ex)
         else:
             raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
