@@ -914,12 +914,17 @@ class ModelRequestProcessor(object):
             self._report_text("after sleep")
             try:
                 # we assume that by now all old deleted endpoints requests already returned
+                self._report_text("model_monitor_update and not cleanup")
                 if model_monitor_update and not cleanup:
+                    self._report_text("for k in list(self._engine_processor_lookup")
                     for k in list(self._engine_processor_lookup.keys()):
+                        self._report_text(f"if k now in self._endpoints {self._endpoints} {k}")
                         if k not in self._endpoints:
                             # atomic
                             self._engine_processor_lookup[k]._model = None
                             gc.collect()
+                            self._report_text(str(self._engine_processor_lookup[k]._preprocess))
+                            self._report_text(dir(self._engine_processor_lookup[k]._preprocess))
                             if hasattr(self._engine_processor_lookup[k]._preprocess, "unload"):
                                 try:
                                     self._engine_processor_lookup[k]._preprocess.unload()
