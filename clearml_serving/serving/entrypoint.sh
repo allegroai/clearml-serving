@@ -42,6 +42,7 @@ then
 fi
 
 while : ; do
+  echo "[DEBUG] ~~~~~~~~~~~~ Debug changes applied ~~~~~~~~~~~~"
   if [ -z "$CLEARML_USE_GUNICORN" ]
   then
     if [ -z "$CLEARML_SERVING_NUM_PROCESS" ]
