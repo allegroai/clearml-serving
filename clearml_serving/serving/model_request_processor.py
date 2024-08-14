@@ -1,7 +1,6 @@
 import json
 import os
 import gc
-import torch
 from collections import deque
 from pathlib import Path
 from random import random
@@ -918,11 +917,13 @@ class ModelRequestProcessor(object):
                         if k not in self._endpoints:
                             # atomic
                             self._engine_processor_lookup[k]._model = None
-                            self._engine_processor_lookup[k]._preprocess = None
-                            del self._engine_processor_lookup[k]
-                            self._engine_processor_lookup.pop(k, None)
                             gc.collect()
-                            torch.cuda.empty_cache()
+                            if hasattr(self._engine_processor_lookup[k]._preprocess, "unload"):
+                                try:
+                                    self._engine_processor_lookup[k]._preprocess.unload()
+                                except Exception as ex:
+                                    print("Exception occurred unloading model: {}".format(ex))
+                            self._engine_processor_lookup.pop(k, None)
                 cleanup = False
                 model_monitor_update = False
             except Exception as ex:

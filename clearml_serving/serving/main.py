@@ -1,13 +1,9 @@
 import os
 import traceback
 import gzip
-import asyncio
 
 from fastapi import FastAPI, Request, Response, APIRouter, HTTPException
 from fastapi.routing import APIRoute
-from fastapi.responses import PlainTextResponse
-
-from starlette.background import BackgroundTask
 
 from typing import Optional, Dict, Any, Callable, Union
 
@@ -52,9 +48,6 @@ try:
 except (ValueError, TypeError):
     pass
 
-class CUDAException(Exception):
-    def __init__(self, exception: str):
-        self.exception = exception
 
 # start FastAPI app
 app = FastAPI(title="ClearML Serving Service", version=__version__, description="ClearML Service Service router")
@@ -75,20 +68,6 @@ async def startup_event():
         )
         print("ModelRequestProcessor [id={}] loaded".format(processor.get_id()))
         processor.launch(poll_frequency_sec=model_sync_frequency_secs*60)
-
-
-@app.on_event('shutdown')
-def shutdown_event():
-    print('RESTARTING INFERENCE SERVICE!')
-    
-async def exit_app():
-    loop = asyncio.get_running_loop()
-    loop.stop()
-    
-@app.exception_handler(CUDAException)
-async def cuda_exception_handler(request, exc):
-    task = BackgroundTask(exit_app)
-    return PlainTextResponse("CUDA out of memory. Restarting service", status_code=500, background=task)
 
 
 router = APIRouter(
@@ -123,10 +102,7 @@ async def serve_model(model_id: str, version: Optional[str] = None, request: Uni
     except ValueError as ex:
         session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
             instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
-        if "CUDA out of memory. " in str(ex) or "NVML_SUCCESS == r INTERNAL ASSERT FAILED" in str(ex):
-            raise CUDAException(exception=ex)
-        else:
-            raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
+        raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
     except Exception as ex:
         session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
             instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
