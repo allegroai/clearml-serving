@@ -917,6 +917,7 @@ class ModelRequestProcessor(object):
                         if k not in self._endpoints:
                             # atomic
                             self._engine_processor_lookup[k]._model = None
+                            print("clearml-serving --id c1a4ebd2586040ad906cf338d16bcb87 model remove --endpoint test_model_sklearn")
                             gc.collect()
                             if hasattr(self._engine_processor_lookup[k]._preprocess, "unload"):
                                 try:

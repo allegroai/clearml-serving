@@ -41,8 +41,7 @@ class Preprocess(object):
         """
         pass
 
-
-    def unload(self) -> None:  # noqa
+    def unload(self) -> None:
         """
         OPTIONAL: provide unloading method for the model
         For example:
