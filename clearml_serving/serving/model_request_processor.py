@@ -796,8 +796,8 @@ class ModelRequestProcessor(object):
             # update model serving state
             self._model_monitoring_versions[model.base_serving_url] = versions_model_ids_dict
 
-        if not self._model_monitoring_update_request:
-            return False
+        # if not self._model_monitoring_update_request:
+        #     return False
 
         self._report_text("INFO: Monitored Models updated: {}".format(
             json.dumps(self._model_monitoring_versions, indent=2))
