@@ -909,17 +909,24 @@ class ModelRequestProcessor(object):
                     self._engine_processor_lookup = dict()
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
+            print("before sleep")
             sleep(poll_frequency_sec)
+            print("after sleep")
             try:
                 # we assume that by now all old deleted endpoints requests already returned
+                print("before if")
                 if model_monitor_update and not cleanup:
+                    print("before 1")
                     for k in list(self._engine_processor_lookup.keys()):
+                        print("before 2")
                         if k not in self._endpoints:
+                            print("before 3")
                             # atomic
                             self._engine_processor_lookup[k]._model = None
                             print("clearml-serving --id c1a4ebd2586040ad906cf338d16bcb87 model remove --endpoint test_model_sklearn")
                             gc.collect()
                             if hasattr(self._engine_processor_lookup[k]._preprocess, "unload"):
+                                print("hasattr")
                                 try:
                                     self._engine_processor_lookup[k]._preprocess.unload()
                                 except Exception as ex:
