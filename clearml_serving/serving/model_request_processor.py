@@ -192,7 +192,6 @@ class ModelRequestProcessor(object):
             return_value = await self._process_request(processor=processor, url=url, body=request_body)
         finally:
             if url and processor is not None and processor is not self._engine_processor_lookup.get(url):
-                self._report_text("calling gc collect in request processing")
                 gc.collect()
             self._request_processing_state.dec()
 
