@@ -1,7 +1,6 @@
 import json
 import os
 import gc
-import torch
 from collections import deque
 from pathlib import Path
 from random import random
@@ -169,6 +168,8 @@ class ModelRequestProcessor(object):
             # retry to process
             return await self.process_request(base_url=base_url, version=version, request_body=request_body)
 
+        processor = None
+        url = None
         try:
             # normalize url and version
             url = self._normalize_endpoint_url(base_url, version)
@@ -190,6 +191,8 @@ class ModelRequestProcessor(object):
 
             return_value = await self._process_request(processor=processor, url=url, body=request_body)
         finally:
+            if url and processor is not None and processor is not self._engine_processor_lookup.get(url):
+                gc.collect()
             self._request_processing_state.dec()
 
         return return_value
@@ -907,22 +910,22 @@ class ModelRequestProcessor(object):
                 if cleanup or model_monitor_update:
                     self._update_serving_plot()
                 if cleanup:
+                    gc.collect()
                     self._engine_processor_lookup = dict()
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
             sleep(poll_frequency_sec)
             try:
                 # we assume that by now all old deleted endpoints requests already returned
+                call_gc_collect = False
                 if model_monitor_update and not cleanup:
                     for k in list(self._engine_processor_lookup.keys()):
                         if k not in self._endpoints:
                             # atomic
-                            self._engine_processor_lookup[k]._model = None
-                            self._engine_processor_lookup[k]._preprocess = None
-                            del self._engine_processor_lookup[k]
                             self._engine_processor_lookup.pop(k, None)
-                            gc.collect()
-                            torch.cuda.empty_cache()
+                            call_gc_collect = True
+                if call_gc_collect:
+                    gc.collect()
                 cleanup = False
                 model_monitor_update = False
             except Exception as ex:
