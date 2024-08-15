@@ -1,7 +1,6 @@
 import os
 import traceback
 import gzip
-import sys
 
 from fastapi import FastAPI, Request, Response, APIRouter, HTTPException
 from fastapi.routing import APIRoute
@@ -105,7 +104,7 @@ async def serve_model(model_id: str, version: Optional[str] = None, request: Uni
             instance_id, type(ex), ex, request, "".join(traceback.format_exc())))
         if "CUDA out of memory. " in str(ex) or "NVML_SUCCESS == r INTERNAL ASSERT FAILED" in str(ex):
             # can't always recover from this - prefer to exit the program such that it can be restarted
-            sys.exit(1)
+            os._exit()
         raise HTTPException(status_code=422, detail="Error [{}] processing request: {}".format(type(ex), ex))
     except Exception as ex:
         session_logger.report_text("[{}] Exception [{}] {} while processing request: {}\n{}".format(
