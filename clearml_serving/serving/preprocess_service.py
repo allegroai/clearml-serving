@@ -94,7 +94,10 @@ class BasePreprocessRequest(object):
             def __del__(self):
                 super_ = super(PreprocessDelWrapper, self)
                 if callable(getattr(super_, "unload", None)):
-                    super_.unload()
+                    try:
+                        super_.unload()
+                    except Exception as ex:
+                        print("Failed unloading model: {}".format(ex))
                 if callable(getattr(super_, "__del__", None)):
                     super_.__del__()
 
