@@ -42,7 +42,6 @@ then
 fi
 
 while : ; do
-  echo "[DEBUG] ~~~~~~~~~~~~ Debug changes applied ~~~~~~~~~~~~"
   if [ -z "$CLEARML_USE_GUNICORN" ]
   then
     if [ -z "$CLEARML_SERVING_NUM_PROCESS" ]
@@ -70,11 +69,8 @@ while : ; do
         $GUNICORN_EXTRA_ARGS
   fi
 
-  echo "[DEBUG] ~~~~~~~~~~~~ Check if we restart here server ~~~~~~~~~~~~"
   if [ -z "$CLEARML_SERVING_RESTART_ON_FAILURE" ]
   then
-    echo "[DEBUG] ~~~~~~~~~~~~ Not restarting ~~~~~~~~~~~~"
     break
   fi
-  echo "[DEBUG] ~~~~~~~~~~~~ Restarting server ~~~~~~~~~~~~"
 done

@@ -801,8 +801,8 @@ class ModelRequestProcessor(object):
             # update model serving state
             self._model_monitoring_versions[model.base_serving_url] = versions_model_ids_dict
 
-        # if not self._model_monitoring_update_request:
-        #     return False
+        if not self._model_monitoring_update_request:
+            return False
 
         self._report_text("INFO: Monitored Models updated: {}".format(
             json.dumps(self._model_monitoring_versions, indent=2))
@@ -877,7 +877,7 @@ class ModelRequestProcessor(object):
         poll_frequency_sec = float(poll_frequency_sec)
         # force mark started on the main serving service task
         self._task.mark_started(force=True)
-        self._report_text("Launching - configuration sync every {} sec -- dbg print".format(poll_frequency_sec))
+        self._report_text("Launching - configuration sync every {} sec".format(poll_frequency_sec))
         cleanup = False
         model_monitor_update = False
         self._update_serving_plot()
@@ -911,14 +911,11 @@ class ModelRequestProcessor(object):
                 if cleanup or model_monitor_update:
                     self._update_serving_plot()
                 if cleanup:
-                    self._report_text("calling gc collect in cleanup")
                     gc.collect()
                     self._engine_processor_lookup = dict()
             except Exception as ex:
                 print("Exception occurred in monitoring thread: {}".format(ex))
-            self._report_text("before sleep")
             sleep(poll_frequency_sec)
-            self._report_text("after sleep")
             try:
                 # we assume that by now all old deleted endpoints requests already returned
                 call_gc_collect = False
@@ -929,7 +926,6 @@ class ModelRequestProcessor(object):
                             self._engine_processor_lookup.pop(k, None)
                             call_gc_collect = True
                 if call_gc_collect:
-                    self._report_text("calling gc collect in try")
                     gc.collect()
                 cleanup = False
                 model_monitor_update = False
