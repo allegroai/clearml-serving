@@ -388,8 +388,6 @@ class ModelRequestProcessor(object):
             return False
         self._endpoints.pop(endpoint_url, None)
         self._remove_registered_input_model(endpoint_url)
-        self._engine_processor_lookup.pop(endpoint_url, None)
-        gc.collect()
         return True
 
     def add_canary_endpoint(
